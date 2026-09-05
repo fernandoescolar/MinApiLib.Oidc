@@ -1,0 +1,53 @@
+namespace MinApiLib.OidcServer.Extensions;
+
+/// <summary>
+/// Extensions for ICache
+/// </summary>
+public static class ICacheExtensions
+{
+    /// <summary>
+    /// Attempts to get an item from the cache. If the item is not found, the <c>get</c> function is used to
+    /// obtain the item and populate the cache.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="cache">The cache.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="duration">The duration.</param>
+    /// <param name="get">The get function.</param>
+    /// <param name="logger">The logger.</param>
+    /// <returns></returns>
+    /// <exception cref="System.ArgumentNullException">cache
+    /// or
+    /// get</exception>
+    /// <exception cref="ArgumentNullException">cache
+    /// or
+    /// get</exception>
+    public static async Task<T?> GetAsync<T>(this ICache<T> cache, string? key, TimeSpan duration, Func<Task<T?>> get, ILogger logger)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(cache);
+        ArgumentNullException.ThrowIfNull(get);
+        if (key == null) return null;
+
+        var item = await cache.GetAsync(key);
+
+        if (item == null)
+        {
+            SecretLog.CacheMiss(logger, key);
+
+            item = await get();
+
+            if (item != null)
+            {
+                SecretLog.CacheSet(logger, key);
+                await cache.SetAsync(key, item, duration);
+            }
+        }
+        else
+        {
+            SecretLog.CacheHit(logger, key);
+        }
+
+        return item;
+    }
+}

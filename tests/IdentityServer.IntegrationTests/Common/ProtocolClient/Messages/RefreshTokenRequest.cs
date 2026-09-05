@@ -1,0 +1,42 @@
+// Derived from IdentityModel 7.0.0 (https://github.com/IdentityModel/IdentityModel), Copyright (c) Brock Allen & Dominick Baier,
+// Apache-2.0: test-only protocol client.
+
+#nullable enable
+
+using System.Collections.Generic;
+
+namespace IdentityServer.IntegrationTests.ProtocolClient;
+
+/// <summary>
+/// Request for token using refresh_token
+/// </summary>
+/// <seealso cref="TokenRequest" />
+public class RefreshTokenRequest : TokenRequest
+{
+    /// <summary>
+    /// Gets or sets the refresh token.
+    /// </summary>
+    /// <value>
+    /// The refresh token.
+    /// </value>
+    public string RefreshToken { get; set; } = default!;
+
+    /// <summary>
+    /// Space separated list of the requested scopes.  The Scope attribute cannot be used to extend the scopes granted by the resource owner
+    /// </summary>
+    /// <remarks>
+    /// See https://datatracker.ietf.org/doc/html/rfc6749#section-6 for further detail on restrictions
+    /// </remarks>
+    /// <value>
+    /// The scope.
+    /// </value>
+    public string? Scope { get; set; }
+
+    /// <summary>
+    /// List of requested resources
+    /// </summary>
+    /// <value>
+    /// The resources.
+    /// </value>
+    public ICollection<string> Resource { get; set; } = new HashSet<string>();
+}

@@ -1,0 +1,53 @@
+namespace Microsoft.AspNetCore.Http;
+
+/// <summary>
+/// Extension methods for signin/out using the OidcServer authentication scheme.
+/// </summary>
+public static class AuthenticationManagerExtensions
+{
+    /// <summary>
+    /// Signs the user in.
+    /// </summary>
+    /// <param name="context">The manager.</param>
+    /// <param name="user">The OidcServer user.</param>
+    /// <returns></returns>
+    public static async Task SignInAsync(this HttpContext context, OidcServerUser user)
+    {
+        await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal());
+    }
+
+    /// <summary>
+    /// Signs the user in.
+    /// </summary>
+    /// <param name="context">The manager.</param>
+    /// <param name="user">The OidcServer user.</param>
+    /// <param name="properties">The authentication properties.</param>
+    /// <returns></returns>
+    public static async Task SignInAsync(this HttpContext context, OidcServerUser user, AuthenticationProperties properties)
+    {
+        await context.SignInAsync(await context.GetCookieAuthenticationSchemeAsync(), user.CreatePrincipal(), properties);
+    }
+
+    internal static TimeProvider GetClock(this HttpContext context)
+    {
+        return context.RequestServices.GetRequiredService<TimeProvider>();
+    }
+
+    internal static async Task<string> GetCookieAuthenticationSchemeAsync(this HttpContext context)
+    {
+        var options = context.RequestServices.GetRequiredService<OidcServerOptions>();
+        if (options.Authentication.CookieAuthenticationScheme != null)
+        {
+            return options.Authentication.CookieAuthenticationScheme;
+        }
+
+        var schemes = context.RequestServices.GetRequiredService<IAuthenticationSchemeProvider>();
+        var scheme = await schemes.GetDefaultAuthenticateSchemeAsync();
+        if (scheme == null)
+        {
+            throw new InvalidOperationException("No DefaultAuthenticateScheme found or no CookieAuthenticationScheme configured on OidcServerOptions.");
+        }
+
+        return scheme.Name;
+    }
+}

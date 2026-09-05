@@ -1,0 +1,83 @@
+<Project>
+
+  <!-- ============================================================ -->
+  <!-- Layout: everything under src/ is a shippable library;        -->
+  <!-- everything else (tests/) is never packed.                     -->
+  <!-- ============================================================ -->
+  <PropertyGroup>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <IsSrcProject>false</IsSrcProject>
+    <IsSrcProject Condition="$(MSBuildProjectDirectory.StartsWith('$(RepoRoot)src'))">true</IsSrcProject>
+  </PropertyGroup>
+
+  <!-- Compilation -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <NeutralLanguage>en</NeutralLanguage>
+    <Deterministic>true</Deterministic>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- XML docs only for shipped libraries (feeds IntelliSense and IDE0005 in build). -->
+    <GenerateDocumentationFile Condition="'$(IsSrcProject)' == 'true'">true</GenerateDocumentationFile>
+    <!--
+      Suppressions that cannot be expressed in .editorconfig (NuGet) live here.
+      Every analyzer/compiler diagnostic severity is configured in .editorconfig,
+      which is the single source of truth for them.
+      NU1507: central package management with several package sources.
+    -->
+    <NoWarn>$(NoWarn);NU1507</NoWarn>
+  </PropertyGroup>
+
+  <!-- Analyzers and code style -->
+  <PropertyGroup>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- Reproducible builds, SourceLink and symbols -->
+  <PropertyGroup>
+    <ContinuousIntegrationBuild Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true' or '$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- Package metadata shared by every src/ project -->
+  <PropertyGroup>
+    <PackageId Condition="'$(IsSrcProject)' == 'true'">$(PackageIdPrefix)$(MSBuildProjectName)</PackageId>
+    <IsPackable Condition="'$(IsSrcProject)' != 'true'">false</IsPackable>
+    <Product>IdentityServer (fork of IdentityServer4)</Product>
+    <Copyright>Copyright (c) Brock Allen &amp; Dominick Baier; modifications Copyright (c) Fernando Escolar</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;Security;Identity;IdentityServer</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <!-- Fill in once the repository has a remote (also drives SourceLink). -->
+    <RepositoryUrl></RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+  </PropertyGroup>
+
+  <!-- MinVer: version from git tags (v1.2.3), pre-release otherwise -->
+  <PropertyGroup>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsSrcProject)' == 'true'">
+    <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(RepoRoot)NOTICE" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AsyncFixer">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

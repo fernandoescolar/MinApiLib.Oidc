@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/.repo/">
+    <File Path=".editorconfig" />
+    <File Path="CHANGELOG.md" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="dotnet.config" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path="NOTICE" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/deploy/" />
+  <Folder Name="/deploy/pipelines/">
+    <File Path="deploy/pipelines/main.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/IdentityServer.AspNetIdentity/IdentityServer.AspNetIdentity.csproj" />
+    <Project Path="src/IdentityServer.IdentityModel/IdentityServer.IdentityModel.csproj" />
+    <Project Path="src/IdentityServer.Models/IdentityServer.Models.csproj" />
+    <Project Path="src/IdentityServer.Storage/IdentityServer.Storage.csproj" />
+    <Project Path="src/IdentityServer/IdentityServer.csproj" />
+    <Project Path="src/MinApiLib.OidcServer/MinApiLib.OidcServer.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
+    <Project Path="tests/IdentityServer.Test/IdentityServer.Test.csproj" />
+    <Project Path="tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj" />
+    <Project Path="tests/MinApiLib.OidcServer.IntegrationTests/MinApiLib.OidcServer.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

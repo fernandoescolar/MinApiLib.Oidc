@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Core model types for IdentityServer (fork of IdentityServer4): clients, resources, grants and protocol constants.</Description>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\IdentityServer.IdentityModel\IdentityServer.IdentityModel.csproj" />
+  </ItemGroup>
+</Project>

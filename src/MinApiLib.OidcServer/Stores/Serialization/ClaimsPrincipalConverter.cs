@@ -1,0 +1,34 @@
+namespace MinApiLib.OidcServer.Stores.Serialization;
+
+public class ClaimsPrincipalConverter : JsonConverter<ClaimsPrincipal>
+{
+    public override ClaimsPrincipal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var source = JsonSerializer.Deserialize<ClaimsPrincipalLite>(ref reader, options);
+
+        if (source == null)
+        {
+            return null;
+        }
+
+        var claims = source.Claims?.Select(x => new Claim(x.Type, x.Value, x.ValueType)) ?? Array.Empty<Claim>();
+        var id = new ClaimsIdentity(claims, source.AuthenticationType, JwtClaimTypes.Name, JwtClaimTypes.Role);
+        return new ClaimsPrincipal(id);
+    }
+
+    public override void Write(Utf8JsonWriter writer, ClaimsPrincipal value, JsonSerializerOptions options)
+    {
+        var target = new ClaimsPrincipalLite
+        {
+            AuthenticationType = value.Identity?.AuthenticationType,
+
+            Claims = value.Claims.Select(x => new ClaimLite
+            {
+                Type = x.Type,
+                Value = x.Value,
+                ValueType = x.ValueType
+            }).ToArray()
+        };
+        JsonSerializer.Serialize(writer, target, options);
+    }
+}

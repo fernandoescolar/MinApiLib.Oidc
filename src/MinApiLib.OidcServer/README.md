@@ -1,0 +1,155 @@
+# MinApiLib.OidcServer
+
+An OpenID Connect and OAuth 2.0 server for ASP.NET Core built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib):
+
+- every protocol endpoint is a MinApiLib endpoint record, mapped with `MapEndpoints`;
+- the default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute and `AddAssembly`.
+
+It is a new implementation derived from the IdentityServer fork in this repository, which in turn derives from
+IdentityServer4 4.1.2 (Apache-2.0). It is a single package with no dependency on any IdentityServer package. It
+depends only on ASP.NET Core, `Microsoft.IdentityModel.*`, `MinApiLib.Endpoints` and `MinApiLib.DependencyInjection`.
+
+It targets `net10.0` and `net11.0`.
+
+## Getting started
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOidcServer(options => options.IssuerUri = "https://login.example.com")
+    .AddInMemoryClients(Config.Clients)
+    .AddInMemoryIdentityResources(Config.IdentityResources)
+    .AddInMemoryApiScopes(Config.ApiScopes)
+    .AddDeveloperSigningCredential();
+
+var app = builder.Build();
+
+app.UseRouting();
+app.UseOidcServer();      // session cookie, CORS, authentication, mutual TLS, logout notifications
+app.UseAuthorization();
+
+app.MapOidcServer()       // the protocol endpoints
+   .ForEndpoint(OidcServerConstants.EndpointNames.Token).RequireRateLimiting("token");
+
+app.Run();
+```
+
+`MapOidcServer()` is required. Without it, the first request fails with an error that says so. It returns a
+conventions builder: conventions added to it apply to every protocol endpoint, and `ForEndpoint(name)` targets
+one endpoint together with its mTLS alias.
+
+## Endpoints
+
+Each endpoint is a MinApiLib record for the HTTP methods the protocol defines for it. Most derive from
+`PostHandlerAsync<TRequest>` or `GetHandlerAsync<TRequest>`. Its `Request` is a record struct bound with
+`[AsParameters]`. It carries the `HttpContext` and, marked `[FromServices]`, the services the endpoint needs for
+that request. MinApiLib creates the record once at startup, so it holds no services itself:
+
+```csharp
+internal abstract record TokenEndpoint(string Path) : PostHandlerAsync<TokenEndpoint.Request>(Path)
+{
+    public readonly record struct Request(
+        HttpContext HttpContext,
+        [FromServices] IClientSecretValidator ClientValidator,
+        [FromServices] ITokenRequestValidator RequestValidator,
+        [FromServices] ITokenResponseGenerator ResponseGenerator,
+        [FromServices] IEventService Events,
+        [FromServices] IDPoPProofValidator DPoPProofValidator,
+        [FromServices] ILogger<TokenEndpoint> Logger);
+
+    protected override RouteHandlerBuilder Configure(RouteHandlerBuilder builder)
+        => builder.AsOidcServerEndpoint(EndpointNames.Token, Path, GetType());
+
+    protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
+    {
+        // ...
+    }
+}
+```
+
+The routes are sealed records in [Endpoints/Routes.cs](Endpoints/Routes.cs). There is one per path and method,
+plus the `/connect/mtls/...` alias of every `connect/` route:
+
+| Endpoint | Routes |
+|---|---|
+| Authorize | `GET` and `POST /connect/authorize` (one record each), `GET /connect/authorize/callback` |
+| Token | `POST /connect/token` |
+| Pushed authorization (RFC 9126) | `POST /connect/par` |
+| Device authorization (RFC 8628) | `POST /connect/deviceauthorization` |
+| Introspection (RFC 7662) | `POST /connect/introspect` |
+| Revocation (RFC 7009) | `POST /connect/revocation` |
+| UserInfo | `GET` and `POST /connect/userinfo` (one record, the same processing for both) |
+| End session | `GET` and `POST /connect/endsession` (one record each), `GET /connect/endsession/callback` |
+| Check session | `GET /connect/checksession` |
+| Nonce | `POST /connect/nonce` |
+| Discovery | `GET /.well-known/openid-configuration`, `GET /.well-known/openid-configuration/jwks` |
+
+Routing answers any other method with 405 and an `Allow` header. The endpoints keep checking the content type: a
+POST without an `application/x-www-form-urlencoded` body gets 415 or the protocol's `invalid_request` error. They
+read the form themselves instead of binding it with `[FromForm]`, which would turn on antiforgery validation.
+
+`AsOidcServerEndpoint` adds what every protocol endpoint shares, as metadata and an endpoint filter:
+
+- **Disabled endpoints.** The endpoint answers 404 when `EndpointsOptions` disables it, and on an mTLS alias
+  unless mutual TLS uses the path mode.
+- **Unhandled exceptions.** An exception thrown while processing the request or executing its result raises an
+  `UnhandledExceptionEvent`.
+- **Metadata.** `OidcServerEndpointMetadata` holds the name, the record type and whether the route is an mTLS
+  alias.
+- **API description.** The endpoint is excluded from the API description, so Swagger documents do not list it.
+
+### Custom endpoints
+
+A custom endpoint is a MinApiLib endpoint in the host's own assembly, mapped with `app.MapEndpoints()`. Call
+`AsOidcServerEndpoint` from its `Configure` to give it the same events and logging as the protocol endpoints.
+
+## Services
+
+The default implementation of every service is marked with `[RegisterInIServiceCollection]`. For example:
+
+```csharp
+[RegisterInIServiceCollection(typeof(ITokenService))]
+public class DefaultTokenService : ITokenService
+```
+
+`AddOidcServer()` collects them with MinApiLib's `AddAssembly` and merges them with try-add semantics:
+
+- a service registered **before** `AddOidcServer()` keeps the host's implementation;
+- a service registered **after** it (as the builder's `Add*` methods do) is the one the container resolves;
+- the services with several implementations (`ISecretParser`, `ISecretValidator` and options setups) are
+  added next to the host's.
+
+Only what an attribute cannot express is registered by hand: options, cookie authentication, decorators, HTTP
+clients, the back-channel logout background service and framework services. See
+[Core.cs](Configuration/DependencyInjection/BuilderExtensions/Core.cs).
+
+## Differences from the IdentityServer project
+
+The protocol behaviour is the same, so the IdentityServer integration test suite runs against this package.
+The one change is that a request with a method the endpoint does not support gets a routing 405. Before, the
+endpoint itself answered, with a 405 or, at the token, device authorization and nonce endpoints, a 400
+`invalid_request`. The API is renamed:
+
+| IdentityServer | MinApiLib.OidcServer |
+|---|---|
+| `IdentityServer.*` namespaces | `MinApiLib.OidcServer.*` |
+| `IdentityServer.IdentityModel` package | `MinApiLib.OidcServer.IdentityModel` namespace, in this package |
+| `AddIdentityServer()`, `UseIdentityServer()`, `MapIdentityServer()` | `AddOidcServer()`, `UseOidcServer()`, `MapOidcServer()` |
+| `IdentityServerOptions`, `IdentityServerConstants`, `IIdentityServerBuilder` | `OidcServerOptions`, `OidcServerConstants`, `IOidcServerBuilder` |
+| `IIdentityServerInteractionService`, `IdentityServerUser`, `IdentityServerTools` | `IOidcServerInteractionService`, `OidcServerUser`, `OidcServerTools` |
+| `IEndpointHandler`, `AddEndpoint<T>()` | MinApiLib endpoint records (`GetHandlerAsync`, `PostHandlerAsync`) with `AsOidcServerEndpoint` |
+| `AddCoreServices()`, `AddPluggableServices()`, `AddValidators()`, ... | `AddDefaultServices()` (attribute scan) |
+| `IdentityServerEndpointMetadata.HandlerType` | `OidcServerEndpointMetadata.EndpointType` |
+
+The protocol values are unchanged. These include the cookie names (`idsrv`, `idsrv.session`,
+`idsrv.external`), the routes, the token formats and the discovery document.
+
+The repository's `IdentityServer.AspNetIdentity` integration and the unit test suite are not ported. The test
+users from `IdentityServer.Test` live in the integration test project
+(`tests/MinApiLib.OidcServer.IntegrationTests/TestUsers`).
+
+## License
+
+Apache License 2.0. This package is derived from IdentityServer4, Copyright (c) Brock Allen and Dominick Baier,
+and from IdentityModel 7.0.0. The repository's [NOTICE](../../NOTICE) holds the required attribution. MinApiLib is
+MIT licensed.
