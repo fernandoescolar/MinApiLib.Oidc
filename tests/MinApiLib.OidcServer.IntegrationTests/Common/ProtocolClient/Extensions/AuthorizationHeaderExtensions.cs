@@ -6,7 +6,7 @@
 
 using System.Net.Http;
 using System.Net.Http.Headers;
-using static MinApiLib.OidcServer.IdentityModel.OidcConstants;
+using static MinApiLib.OidcServer.Core.IdentityModel.OidcConstants;
 
 namespace MinApiLib.OidcServer.IntegrationTests.ProtocolClient;
 

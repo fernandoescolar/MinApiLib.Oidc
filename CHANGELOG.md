@@ -56,9 +56,11 @@ Read this before you move a host from IdentityServer4 4.1.2:
     HTTP methods each one supports (`POST /connect/token`, `GET /.well-known/openid-configuration`, ...), mapped
     with `MapOidcServer()`. Other methods get a routing 405.
   - The default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute.
-  - The API is renamed (`AddOidcServer`, `OidcServerOptions`, `MinApiLib.OidcServer.*` namespaces); the protocol
-    behaviour is the same, and the integration test suite runs against it in
-    `tests/MinApiLib.OidcServer.IntegrationTests`.
+  - The code is organized in vertical slices: one folder and namespace per feature (`Features/Tokens`,
+    `Features/Authorize`, ...) and a shared `Core`.
+  - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.OidcServer.Features.*` and
+    `MinApiLib.OidcServer.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
+    runs against it in `tests/MinApiLib.OidcServer.IntegrationTests`.
 
 ### Hosting
 

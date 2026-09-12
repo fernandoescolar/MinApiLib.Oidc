@@ -1,10 +1,15 @@
-using MinApiLib.OidcServer.Extensions;
+using MinApiLib.OidcServer.Core.Configuration;
+using MinApiLib.OidcServer.Core.Extensions;
+using MinApiLib.OidcServer.Core.Infrastructure;
+using MinApiLib.OidcServer.Core.Stores;
+using MinApiLib.OidcServer.Core.TokenServices;
+using MinApiLib.OidcServer.Core.Users;
 namespace MinApiLib.OidcServer.Test;
 
 /// <summary>
 /// Profile service for test users
 /// </summary>
-/// <seealso cref="MinApiLib.OidcServer.Services.IProfileService" />
+/// <seealso cref="MinApiLib.OidcServer.Core.Users.IProfileService" />
 public class TestUserProfileService : IProfileService
 {
     /// <summary>

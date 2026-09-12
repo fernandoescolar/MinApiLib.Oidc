@@ -1,6 +1,20 @@
-using MinApiLib.OidcServer.Events;
-using MinApiLib.OidcServer.Hosting;
-using MinApiLib.OidcServer.ResponseHandling;
+using MinApiLib.OidcServer.Core.ClientAuthentication;
+using MinApiLib.OidcServer.Core.Clients;
+using MinApiLib.OidcServer.Core.Events;
+using MinApiLib.OidcServer.Core.TokenServices;
+using MinApiLib.OidcServer.Features.DeviceFlow;
+using MinApiLib.OidcServer.Features.Interaction;
+using MinApiLib.OidcServer.Features.Introspection;
+using MinApiLib.OidcServer.Features.Nonce;
+using MinApiLib.OidcServer.Features.Revocation;
+using MinApiLib.OidcServer.Features.Session;
+using MinApiLib.OidcServer.Core.Cors;
+using MinApiLib.OidcServer.Core.DPoP;
+using MinApiLib.OidcServer.Core.Hosting;
+using MinApiLib.OidcServer.Features.Authorize;
+using MinApiLib.OidcServer.Features.Discovery;
+using MinApiLib.OidcServer.Features.Tokens;
+using MinApiLib.OidcServer.Features.UserInfo;
 using Microsoft.AspNetCore.Routing;
 
 namespace MinApiLib.OidcServer.IntegrationTests.Hosting;
@@ -154,7 +168,7 @@ public class MinApiLibHostingTests : IDisposable
         public Task<Dictionary<string, object>> CreateDiscoveryDocumentAsync(string baseUrl, string issuerUri)
             => throw new InvalidOperationException("boom");
 
-        public Task<IEnumerable<Models.JsonWebKey>> CreateJwkDocumentAsync()
+        public Task<IEnumerable<MinApiLib.OidcServer.Features.Discovery.JsonWebKey>> CreateJwkDocumentAsync()
             => throw new InvalidOperationException("boom");
     }
 

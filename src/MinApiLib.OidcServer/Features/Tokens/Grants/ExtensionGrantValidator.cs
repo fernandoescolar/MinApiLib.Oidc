@@ -1,0 +1,73 @@
+namespace MinApiLib.OidcServer.Features.Tokens.Grants;
+
+/// <summary>
+/// Validates an extension grant request using the registered validators
+/// </summary>
+[RegisterInIServiceCollection]
+public class ExtensionGrantValidator
+{
+    private readonly ILogger _logger;
+    private readonly IEnumerable<IExtensionGrantValidator> _validators;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ExtensionGrantValidator"/> class.
+    /// </summary>
+    /// <param name="validators">The validators.</param>
+    /// <param name="logger">The logger.</param>
+    public ExtensionGrantValidator(IEnumerable<IExtensionGrantValidator> validators, ILogger<ExtensionGrantValidator> logger)
+    {
+        if (validators == null)
+        {
+            _validators = Enumerable.Empty<IExtensionGrantValidator>();
+        }
+        else
+        {
+            _validators = validators;
+        }
+
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Gets the available grant types.
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<string> GetAvailableGrantTypes()
+    {
+        return _validators.Select(v => v.GrantType);
+    }
+
+    /// <summary>
+    /// Validates the request.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <returns></returns>
+    public async Task<GrantValidationResult> ValidateAsync(ValidatedTokenRequest request)
+    {
+        var validator = _validators.FirstOrDefault(v => v.GrantType.Equals(request.GrantType, StringComparison.Ordinal));
+
+        if (validator == null)
+        {
+            RequestValidationLog.NoExtensionGrantValidator(_logger);
+            return new GrantValidationResult(TokenRequestErrors.UnsupportedGrantType);
+        }
+
+        try
+        {
+            RequestValidationLog.CallingCustomGrantValidator(_logger, validator.GetType().FullName!);
+
+            var context = new ExtensionGrantValidationContext
+            {
+                Request = request
+            };
+
+            await validator.ValidateAsync(context);
+            return context.Result;
+        }
+        catch (Exception e)
+        {
+            RequestValidationLog.GrantValidationError(_logger, e, e.Message);
+            return new GrantValidationResult(TokenRequestErrors.InvalidGrant);
+        }
+    }
+}

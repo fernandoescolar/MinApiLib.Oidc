@@ -1,4 +1,9 @@
-using MinApiLib.OidcServer.Extensions;
+using MinApiLib.OidcServer.Core.Configuration;
+using MinApiLib.OidcServer.Core.Extensions;
+using MinApiLib.OidcServer.Core.Infrastructure;
+using MinApiLib.OidcServer.Core.Stores;
+using MinApiLib.OidcServer.Core.TokenServices;
+using MinApiLib.OidcServer.Core.Users;
 using Microsoft.AspNetCore.Http;
 
 namespace MinApiLib.OidcServer.IntegrationTests.Common;

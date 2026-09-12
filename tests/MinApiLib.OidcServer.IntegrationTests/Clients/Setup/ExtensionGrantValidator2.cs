@@ -12,7 +12,7 @@ public class ExtensionGrantValidator2 : IExtensionGrantValidator
         }
         else
         {
-            context.Result = new GrantValidationResult(MinApiLib.OidcServer.Models.TokenRequestErrors.InvalidGrant, "invalid custom credential");
+            context.Result = new GrantValidationResult(MinApiLib.OidcServer.Features.Tokens.TokenRequestErrors.InvalidGrant, "invalid custom credential");
         }
 
         return Task.CompletedTask;

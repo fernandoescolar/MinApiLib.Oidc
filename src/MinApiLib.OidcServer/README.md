@@ -38,6 +38,41 @@ app.Run();
 conventions builder: conventions added to it apply to every protocol endpoint, and `ForEndpoint(name)` targets
 one endpoint together with its mTLS alias.
 
+## Layout
+
+The code is organized in vertical slices. Each protocol feature has its own folder and namespace with
+everything it needs:
+
+- its endpoint records and their routes;
+- its extension points and their default implementations;
+- its request and response models and its results;
+- its events and its log messages.
+
+What several features share lives in `Core`.
+
+| Folder (namespace `MinApiLib.OidcServer.*`) | Contents |
+|---|---|
+| `Features/Authorize` | Authorize endpoint (GET, POST, callback), request validation, request objects, prompts, interaction and response generators, redirect URI validation |
+| `Features/PushedAuthorization` | PAR endpoint and its store (RFC 9126) |
+| `Features/Tokens` | Token endpoint, token request validation, custom validators, response generator |
+| `Features/Tokens/Grants` | One validator per grant: authorization code, client credentials, refresh token, device code, password, extension grants |
+| `Features/DeviceFlow` | Device authorization endpoint, device and user codes, throttling, device flow interaction (RFC 8628) |
+| `Features/Introspection`, `Features/Revocation`, `Features/UserInfo`, `Features/Discovery`, `Features/Nonce` | One endpoint each, with its validator, response generator and results |
+| `Features/Session` | End session, its callback, check session, user session, front-channel and back-channel logout, federated sign-out |
+| `Features/Interaction` | `IOidcServerInteractionService` for the login and consent UI: consent, messages, return URLs, grants |
+| `Features/LocalApi` | Local API authentication handler |
+| `Core/Configuration` | `AddOidcServer`, `UseOidcServer`, `MapOidcServer`, the builder and `OidcServerOptions` |
+| `Core/Hosting`, `Core/Cors` | Middleware, the shared endpoint behaviour (`AsOidcServerEndpoint`), CORS |
+| `Core/Models`, `Core/Stores` | Clients, resources, grants and tokens, and their stores |
+| `Core/TokenServices`, `Core/Keys` | Token creation and validation, claims, signing keys |
+| `Core/ClientAuthentication`, `Core/Clients`, `Core/ResourceValidation`, `Core/DPoP`, `Core/Users` | Client secrets and assertions, client configuration, scopes and resource indicators, DPoP, profile service |
+| `Core/Events`, `Core/Logging`, `Core/Infrastructure`, `Core/Extensions`, `Core/IdentityModel` | Cross-cutting services and protocol constants |
+
+`OidcServerConstants` stays in the root namespace. The registration API (`AddOidcServer`, `UseOidcServer`,
+`MapOidcServer`) lives in the `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`
+namespaces. A host usually imports `MinApiLib.OidcServer.Core.Models`, plus the namespace of each feature it
+extends: for example, `MinApiLib.OidcServer.Features.Tokens` to implement `ICustomTokenRequestValidator`.
+
 ## Endpoints
 
 Each endpoint is a MinApiLib record for the HTTP methods the protocol defines for it. Most derive from
@@ -67,8 +102,8 @@ internal abstract record TokenEndpoint(string Path) : PostHandlerAsync<TokenEndp
 }
 ```
 
-The routes are sealed records in [Endpoints/Routes.cs](Endpoints/Routes.cs). There is one per path and method,
-plus the `/connect/mtls/...` alias of every `connect/` route:
+The routes are sealed records at the end of each endpoint file. There is one per path and method, plus the
+`/connect/mtls/...` alias of every `connect/` route:
 
 | Endpoint | Routes |
 |---|---|
@@ -121,7 +156,7 @@ public class DefaultTokenService : ITokenService
 
 Only what an attribute cannot express is registered by hand: options, cookie authentication, decorators, HTTP
 clients, the back-channel logout background service and framework services. See
-[Core.cs](Configuration/DependencyInjection/BuilderExtensions/Core.cs).
+[Core.cs](Core/Configuration/Core.cs).
 
 ## Differences from the IdentityServer project
 
@@ -132,8 +167,8 @@ endpoint itself answered, with a 405 or, at the token, device authorization and 
 
 | IdentityServer | MinApiLib.OidcServer |
 |---|---|
-| `IdentityServer.*` namespaces | `MinApiLib.OidcServer.*` |
-| `IdentityServer.IdentityModel` package | `MinApiLib.OidcServer.IdentityModel` namespace, in this package |
+| `IdentityServer.*` namespaces, by layer (`Models`, `Validation`, `Services`, ...) | `MinApiLib.OidcServer.Features.*` and `MinApiLib.OidcServer.Core.*`, by feature (see [Layout](#layout)) |
+| `IdentityServer.IdentityModel` package | `MinApiLib.OidcServer.Core.IdentityModel` namespace, in this package |
 | `AddIdentityServer()`, `UseIdentityServer()`, `MapIdentityServer()` | `AddOidcServer()`, `UseOidcServer()`, `MapOidcServer()` |
 | `IdentityServerOptions`, `IdentityServerConstants`, `IIdentityServerBuilder` | `OidcServerOptions`, `OidcServerConstants`, `IOidcServerBuilder` |
 | `IIdentityServerInteractionService`, `IdentityServerUser`, `IdentityServerTools` | `IOidcServerInteractionService`, `OidcServerUser`, `OidcServerTools` |

@@ -1,4 +1,11 @@
-using MinApiLib.OidcServer.ResponseHandling;
+using MinApiLib.OidcServer.Features.Authorize;
+using MinApiLib.OidcServer.Features.DeviceFlow;
+using MinApiLib.OidcServer.Features.Discovery;
+using MinApiLib.OidcServer.Features.Introspection;
+using MinApiLib.OidcServer.Features.Nonce;
+using MinApiLib.OidcServer.Features.Revocation;
+using MinApiLib.OidcServer.Features.Tokens;
+using MinApiLib.OidcServer.Features.UserInfo;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace MinApiLib.OidcServer.IntegrationTests.Endpoints.Authorize;
