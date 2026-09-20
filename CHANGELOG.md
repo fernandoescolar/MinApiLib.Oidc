@@ -61,6 +61,11 @@ Read this before you move a host from IdentityServer4 4.1.2:
   - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.OidcServer.Features.*` and
     `MinApiLib.OidcServer.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
     runs against it in `tests/MinApiLib.OidcServer.IntegrationTests`.
+- **New `MinApiLib.OidcServer.MongoDB` package.** MongoDB stores for clients, resources, CORS origins, persisted
+  grants, device codes and the signing keys of automatic key management, with TTL indexes that expire grants and
+  device codes. Its tests run against MongoDB in Docker (Testcontainers).
+- **Samples.** `samples/` has a server, a web client and an API that show the code flow and API calls with bearer
+  and DPoP-bound access tokens, in memory or on MongoDB.
 
 ### Hosting
 

@@ -11,10 +11,12 @@
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.15" />
   </ItemGroup>
   <ItemGroup Condition=" '$(TargetFramework)' == 'net11.0' ">
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="11.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="11.0.0" />
   </ItemGroup>
 
@@ -24,6 +26,8 @@
     <PackageVersion Include="AsyncFixer" Version="2.1.0" />
     <PackageVersion Include="MinApiLib.Endpoints" Version="11.0.0" />
     <PackageVersion Include="MinApiLib.DependencyInjection" Version="11.0.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.13.0" />
+    <PackageVersion Include="Testcontainers.MongoDb" Version="4.16.0" />
     <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.3" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
   </ItemGroup>

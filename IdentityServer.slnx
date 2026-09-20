@@ -22,11 +22,21 @@
     <Project Path="src/IdentityServer.Storage/IdentityServer.Storage.csproj" />
     <Project Path="src/IdentityServer/IdentityServer.csproj" />
     <Project Path="src/MinApiLib.OidcServer/MinApiLib.OidcServer.csproj" />
+    <Project Path="src/MinApiLib.OidcServer.MongoDB/MinApiLib.OidcServer.MongoDB.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <File Path="samples/README.md" />
+    <File Path="samples/compose.yaml" />
+    <File Path="samples/Directory.Build.props" />
+    <Project Path="samples/Api/Api.csproj" />
+    <Project Path="samples/Server/Server.csproj" />
+    <Project Path="samples/WebClient/WebClient.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
     <Project Path="tests/IdentityServer.Test/IdentityServer.Test.csproj" />
     <Project Path="tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj" />
     <Project Path="tests/MinApiLib.OidcServer.IntegrationTests/MinApiLib.OidcServer.IntegrationTests.csproj" />
+    <Project Path="tests/MinApiLib.OidcServer.MongoDB.Tests/MinApiLib.OidcServer.MongoDB.Tests.csproj" />
   </Folder>
 </Solution>

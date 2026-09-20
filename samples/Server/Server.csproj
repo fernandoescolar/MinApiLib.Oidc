@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Samples.Server</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MinApiLib.OidcServer\MinApiLib.OidcServer.csproj" />
+    <ProjectReference Include="..\..\src\MinApiLib.OidcServer.MongoDB\MinApiLib.OidcServer.MongoDB.csproj" />
+  </ItemGroup>
+</Project>

@@ -9,7 +9,9 @@ It is a new implementation derived from the IdentityServer fork in this reposito
 IdentityServer4 4.1.2 (Apache-2.0). It is a single package with no dependency on any IdentityServer package. It
 depends only on ASP.NET Core, `Microsoft.IdentityModel.*`, `MinApiLib.Endpoints` and `MinApiLib.DependencyInjection`.
 
-It targets `net10.0` and `net11.0`.
+It targets `net10.0` and `net11.0`. [MinApiLib.OidcServer.MongoDB](../MinApiLib.OidcServer.MongoDB/README.md) stores
+its configuration and operational data in MongoDB, and [samples/](../../samples/README.md) has a server, a web client
+and an API built with it.
 
 ## Getting started
 
