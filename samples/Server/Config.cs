@@ -30,8 +30,22 @@ public static class Config
 
         // The same web application with proof-of-possession: the token endpoint refuses requests without a DPoP
         // proof, and the access token is bound to the key of the proof (cnf.jkt).
-        WebClient("web.dpop", webClientUrl, suffix: "-dpop", requireDPoP: true)
+        WebClient("web.dpop", webClientUrl, suffix: "-dpop", requireDPoP: true),
+
+        // A background service with its own tokens (client credentials, no user), bearer and DPoP-bound.
+        Worker("worker", requireDPoP: false),
+        Worker("worker.dpop", requireDPoP: true)
     ];
+
+    private static Client Worker(string clientId, bool requireDPoP) => new()
+    {
+        ClientId = clientId,
+        ClientName = requireDPoP ? "Sample worker (DPoP)" : "Sample worker (Bearer)",
+        ClientSecrets = { new Secret("worker-secret".Sha256()) },
+        AllowedGrantTypes = GrantTypes.ClientCredentials,
+        RequireDPoP = requireDPoP,
+        AllowedScopes = { "orders.read" }
+    };
 
     private static Client WebClient(string clientId, string url, string suffix, bool requireDPoP) => new()
     {

@@ -10,7 +10,7 @@ public sealed record LogoutPage() : GetHandlerAsync<LogoutPage.Request>("/logout
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
         var result = await request.HttpContext.AuthenticateAsync(Schemes.Cookie);
-        var scheme = result.Properties?.Items.TryGetValue(Schemes.SchemeProperty, out var value) == true && value != null ? value : Schemes.Bearer;
+        var scheme = Schemes.Of(result.Properties) ?? Schemes.Bearer;
 
         return Results.SignOut(new AuthenticationProperties { RedirectUri = "/" }, [Schemes.Cookie, scheme]);
     }

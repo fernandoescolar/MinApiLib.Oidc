@@ -22,6 +22,7 @@
     <Project Path="src/IdentityServer.Storage/IdentityServer.Storage.csproj" />
     <Project Path="src/IdentityServer/IdentityServer.csproj" />
     <Project Path="src/MinApiLib.OidcServer/MinApiLib.OidcServer.csproj" />
+    <Project Path="src/MinApiLib.OidcServer.Client/MinApiLib.OidcServer.Client.csproj" />
     <Project Path="src/MinApiLib.OidcServer.MongoDB/MinApiLib.OidcServer.MongoDB.csproj" />
   </Folder>
   <Folder Name="/samples/">
@@ -31,11 +32,13 @@
     <Project Path="samples/Api/Api.csproj" />
     <Project Path="samples/Server/Server.csproj" />
     <Project Path="samples/WebClient/WebClient.csproj" />
+    <Project Path="samples/Worker/Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
     <Project Path="tests/IdentityServer.Test/IdentityServer.Test.csproj" />
     <Project Path="tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj" />
+    <Project Path="tests/MinApiLib.OidcServer.Client.Tests/MinApiLib.OidcServer.Client.Tests.csproj" />
     <Project Path="tests/MinApiLib.OidcServer.IntegrationTests/MinApiLib.OidcServer.IntegrationTests.csproj" />
     <Project Path="tests/MinApiLib.OidcServer.MongoDB.Tests/MinApiLib.OidcServer.MongoDB.Tests.csproj" />
   </Folder>

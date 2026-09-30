@@ -10,6 +10,7 @@ public static class Schemes
     /// <summary>Signs in with the "web.dpop" client: DPoP-bound access tokens.</summary>
     public const string DPoP = "oidc-dpop";
 
-    /// <summary>The authentication property that records which of the two signed the user in.</summary>
-    public const string SchemeProperty = "sample.scheme";
+    /// <summary>The OpenID Connect scheme that signed the user in, which AddOpenIdConnectTokens records in the session.</summary>
+    public static string? Of(AuthenticationProperties? properties)
+        => properties?.Items.TryGetValue(OidcClientDefaults.SchemeProperty, out var scheme) == true ? scheme : null;
 }

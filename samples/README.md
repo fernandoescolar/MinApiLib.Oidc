@@ -1,17 +1,19 @@
 # Samples
 
-Three applications that show a web application signing a user in with
-[MinApiLib.OidcServer](../src/MinApiLib.OidcServer/README.md) and then calling an API with the user's access token.
-The token is either a plain **bearer** token or a **DPoP**-bound token (proof of possession,
-[RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)).
+Applications that show a web application signing a user in with
+[MinApiLib.OidcServer](../src/MinApiLib.OidcServer/README.md) and then calling an API with the user's access token,
+and a background worker calling the same API with its own token. The token is either a plain **bearer** token or a
+**DPoP**-bound token (proof of possession, [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)). The web client and the
+worker get and send their tokens with [MinApiLib.OidcServer.Client](../src/MinApiLib.OidcServer.Client/README.md).
 
 | Application | URL | What it does |
 |---|---|---|
 | [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login, logout and error pages. In memory, or on MongoDB |
-| [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application: OpenID Connect login (code flow with PKCE), calls the API |
+| [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application: OpenID Connect login (code flow with PKCE), calls the API with the user's token |
 | [Api](Api) | https://localhost:5003 | Orders API: validates the access token and, for DPoP, the proof |
+| [Worker](Worker) | | Console application: calls the API with its own token (client credentials) and prints each request |
 
-The three are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records.
+The web applications are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records.
 
 ## Run
 
@@ -42,6 +44,12 @@ The three are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLi
    ```
 
 3. Open https://localhost:5002 and sign in as `alice` / `alice` or `bob` / `bob`.
+
+4. To run the worker, with the server and the API started:
+
+   ```bash
+   dotnet run --project Worker
+   ```
 
 ### With MongoDB
 
@@ -81,14 +89,17 @@ orders. Anyone who copies the token can do the same until it expires.
 
 The client `web.dpop` has `RequireDPoP = true`: the server refuses token requests without a proof.
 
-1. Right before redeeming the authorization code, the web client creates a P-256 key for the session
-   ([Oidc.cs](WebClient/Oidc.cs)). It keeps the key, protected, in the session cookie.
-2. It adds a `DPoP` proof of that key to the token request
-   ([DPoPTokenRequestHandler.cs](WebClient/DPoP/DPoPTokenRequestHandler.cs)).
+The web client registers the scheme with `AddOpenIdConnectTokens(Schemes.DPoP, options => options.UseDPoP = true)`
+and the API client with `AddUserAccessTokenHandler()` ([Program.cs](WebClient/Program.cs)). The library does the rest:
+
+1. When the sign-in starts, it creates a P-256 key for the session and sends its thumbprint in the authorization
+   request (`dpop_jkt`). The authorization code is bound to the key. The key travels, protected, in the state, and
+   then stays in the session cookie.
+2. It redeems the code with a `DPoP` proof of that key.
 3. The server answers `"token_type": "DPoP"`, and the access token carries the key thumbprint in `cnf.jkt`. The home
    page shows the session key, its thumbprint and the token, so you can compare them.
 4. Each API call sends the token with the `DPoP` scheme and a new proof, signed by the key, for that method and URL,
-   with the token hash in `ath` ([DPoPProof.cs](WebClient/DPoP/DPoPProof.cs)):
+   with the token hash in `ath`:
 
    ```http
    GET /orders HTTP/1.1
@@ -101,7 +112,11 @@ The client `web.dpop` has `RequireDPoP = true`: the server refuses token request
    `jti` not seen before, and that the thumbprint of its key equals `cnf.jkt`
    ([DPoPProofValidator.cs](Api/DPoP/DPoPProofValidator.cs), [DPoPJwtBearerEvents.cs](Api/DPoP/DPoPJwtBearerEvents.cs)).
 
-The page has three more buttons, which play the attacker who stole the token:
+The access token lasts an hour. A minute before it expires, the library refreshes it with the refresh token and a
+proof of the same key, and writes the new tokens to the session cookie.
+
+The page has three more buttons, which play the attacker who stole the token. They build the requests by hand with
+the library's `DPoPKey` and `DPoPProof` ([Api.cs](WebClient/Api.cs)):
 
 | Button | What is sent | API answer |
 |---|---|---|
@@ -111,13 +126,28 @@ The page has three more buttons, which play the attacker who stole the token:
 
 The [proof-of-possession documentation](../docs/topics/pop.md) walks through the same exchange message by message.
 
+### Worker
+
+The worker has two clients of the server, `worker` (bearer) and `worker.dpop` (`RequireDPoP`), and no user. It
+registers each with `AddClientCredentialsTokens` and an HTTP client with `AddClientCredentialsTokenHandler`
+([Program.cs](Worker/Program.cs)), and calls the API twice with each. The output shows the same token in both calls
+and, for DPoP, a new proof each time:
+
+```http
+GET /orders HTTP/1.1
+Host: localhost:5003
+Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6...
+DPoP: eyJhbGciOiJFUzI1NiIsImp3ayI6eyJrdHkiOiJF...
+  proof payload: {"jti":"YX6oiCkLRVo2jBtFAHpmmw","htm":"GET","htu":"https://localhost:5003/orders","iat":1794854834,"ath":"IknNWzIa..."}
+
+HTTP/1.1 200 OK
+{ "user": null, "client": "worker.dpop", "tokenScheme": "DPoP", "boundToKey": "T-98tzp8BzD9FCouaCQ28btQdYTmw_igGv9TXJmQdVo", ... }
+```
+
 ## What the samples leave out
 
 They are kept short to show the protocol. A real deployment also needs:
 
 - a real user store, such as ASP.NET Core Identity, and a consent page if clients require consent;
 - a persistent store for production. The in-memory one loses grants on restart; use the MongoDB stores or your own;
-- token refresh in the web client. The access token lasts an hour. With DPoP, the refresh request needs a proof
-  of the same key;
-- binding the authorization code to the key with `dpop_jkt`. The sample creates the key when the code arrives;
 - a distributed replay cache in the API when it runs on several instances. The sample uses `IMemoryCache`.

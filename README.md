@@ -22,6 +22,7 @@ A full assessment of the code base and the roadmap for the fork is in
 | `IdentityServer.AspNetIdentity` | ASP.NET Core Identity integration |
 | `MinApiLib.OidcServer` | A new implementation derived from this fork, in a single package: the endpoints are [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records and the services are registered with MinApiLib's dependency injection attribute. It does not depend on any `IdentityServer` package. See [its README](src/MinApiLib.OidcServer/README.md) |
 | `MinApiLib.OidcServer.MongoDB` | MongoDB stores for `MinApiLib.OidcServer`: clients, resources, grants, device codes and signing keys. See [its README](src/MinApiLib.OidcServer.MongoDB/README.md) |
+| `MinApiLib.OidcServer.Client` | Access tokens for `HttpClient`, for any OpenID Connect server: client credentials and the signed-in user's tokens, as bearer or DPoP-bound tokens, with caching, refresh and DPoP nonces. See [its README](src/MinApiLib.OidcServer.Client/README.md) |
 
 ## Hosting
 
@@ -135,8 +136,9 @@ an Azure Artifacts feed (the feed name is a placeholder to fill in).
 ## Samples
 
 [samples/](samples/README.md) has a server built with `MinApiLib.OidcServer` (in memory or on MongoDB), a web
-client and an API. The web client signs the user in and calls the API with the user's access token, as a bearer
-token or as a DPoP-bound token, and shows each HTTP request and response.
+client, an API and a worker. The web client signs the user in and calls the API with the user's access token, and
+the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. Both use
+`MinApiLib.OidcServer.Client` and show each HTTP request and response.
 
 ## Changes from IdentityServer4
 

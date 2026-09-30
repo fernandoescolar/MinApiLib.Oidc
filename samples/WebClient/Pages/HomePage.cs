@@ -2,7 +2,7 @@ namespace Samples.WebClient.Pages;
 
 public sealed record HomePage() : GetHandlerAsync<HomePage.Request>("/")
 {
-    public readonly record struct Request(HttpContext HttpContext);
+    public readonly record struct Request(HttpContext HttpContext, [FromServices] IUserAccessTokenManager Tokens);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
@@ -22,18 +22,18 @@ public sealed record HomePage() : GetHandlerAsync<HomePage.Request>("/")
                 """);
         }
 
-        var properties = result.Properties!;
-        var accessToken = properties.GetTokenValue("access_token")!;
-        var tokenType = properties.GetTokenValue("token_type") ?? "Bearer";
-        var (header, payload) = Jwt.Decode(accessToken);
+        // The token the API calls use: the library reads it from the session, refreshed if it is about to expire.
+        var token = (await request.Tokens.GetAccessTokenAsync(http, Schemes.Cookie, cancellationToken: cancellationToken))!;
+        var tokenType = token.TokenType;
+        var (header, payload) = Jwt.Decode(token.Value);
 
         var keySection = string.Empty;
-        if (properties.Items.TryGetValue(DPoPKey.PropertyName, out var keyJson) && keyJson != null)
+        if (token.DPoPKey is { } key)
         {
-            using var key = DPoPKey.FromJson(keyJson);
             keySection = $"""
                 <h2>Session key</h2>
-                <p>The public key, sent in every proof, and its thumbprint, which the access token carries in <code>cnf.jkt</code>:</p>
+                <p>The public key, sent in every proof, and its thumbprint, which the access token carries in <code>cnf.jkt</code>.
+                   The authorization request sent the thumbprint too (<code>dpop_jkt</code>), which bound the code to the key:</p>
                 {Html.Pre(JsonSerializer.Serialize(key.PublicJwk, Jwt.Indented))}
                 {Html.Pre("jkt = " + key.Thumbprint)}
                 """;
@@ -49,7 +49,7 @@ public sealed record HomePage() : GetHandlerAsync<HomePage.Request>("/")
             : """<a href="/call-api">Call the API</a>""";
 
         return Html.Page($"Signed in as {result.Principal!.Identity!.Name}", $"""
-            <p>Signed in with the <strong>{Html.Encode(properties.Items[Schemes.SchemeProperty])}</strong> scheme.
+            <p>Signed in with the <strong>{Html.Encode(Schemes.Of(result.Properties))}</strong> scheme.
                The token endpoint answered <code>"token_type": "{Html.Encode(tokenType)}"</code>.</p>
             <p class="actions">{modes}<a href="/logout">Sign out</a></p>
             <h2>Access token</h2>

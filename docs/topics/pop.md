@@ -40,7 +40,9 @@ Discovery announces the accepted algorithms in `dpop_signing_alg_values_supporte
 ## How DPoP works, step by step
 
 The [samples](../../samples/README.md) run this exchange: a web client signs in with DPoP and calls an API, and its
-pages show each request and response.
+pages show each request and response. On the client side,
+[MinApiLib.OidcServer.Client](../../src/MinApiLib.OidcServer.Client/README.md) does steps 1 to 5 for you, with any
+`HttpClient`.
 
 The example follows a web application, the client `web.dpop`, that signs a user in with the authorization code
 flow and then calls an orders API with the user's access token. The values are real: the proofs are signed with

@@ -10,8 +10,9 @@ IdentityServer4 4.1.2 (Apache-2.0). It is a single package with no dependency on
 depends only on ASP.NET Core, `Microsoft.IdentityModel.*`, `MinApiLib.Endpoints` and `MinApiLib.DependencyInjection`.
 
 It targets `net10.0` and `net11.0`. [MinApiLib.OidcServer.MongoDB](../MinApiLib.OidcServer.MongoDB/README.md) stores
-its configuration and operational data in MongoDB, and [samples/](../../samples/README.md) has a server, a web client
-and an API built with it.
+its configuration and operational data in MongoDB, [MinApiLib.OidcServer.Client](../MinApiLib.OidcServer.Client/README.md)
+gets and sends access tokens, bearer or DPoP-bound, from client applications, and [samples/](../../samples/README.md)
+has a server, a web client, an API and a worker built with them.
 
 ## Getting started
 

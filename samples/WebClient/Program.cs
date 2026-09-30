@@ -1,9 +1,7 @@
 using Samples.WebClient;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddHttpClient(Api.HttpClientName, client => client.BaseAddress = new Uri(builder.Configuration["ApiUrl"]!));
+var apiUrl = new Uri(builder.Configuration["ApiUrl"]!);
 
 builder.Services
     .AddAuthentication(options =>
@@ -17,9 +15,21 @@ builder.Services
     .AddOpenIdConnect(Schemes.Bearer, options => Oidc.Configure(options, builder.Configuration, "web", suffix: string.Empty))
     .AddOpenIdConnect(Schemes.DPoP, options => Oidc.Configure(options, builder.Configuration, "web.dpop", suffix: "-dpop"));
 
-// The DPoP client signs its token request with the key of the session (see DPoPTokenRequestHandler).
-builder.Services.AddOptions<OpenIdConnectOptions>(Schemes.DPoP)
-    .Configure<IHttpContextAccessor>((options, accessor) => options.BackchannelHttpHandler = DPoPTokenRequestHandler.Create(accessor));
+// MinApiLib.OidcServer.Client keeps the user's tokens in the session and refreshes them. For the DPoP scheme, it
+// creates a key for each sign-in, binds the authorization code to it (dpop_jkt) and adds a proof of it to the code
+// redemption, the refreshes and every API call.
+builder.Services.AddOpenIdConnectTokens(Schemes.Bearer);
+builder.Services.AddOpenIdConnectTokens(Schemes.DPoP, options => options.UseDPoP = true);
+
+// The API client: sends the user's token, as a bearer token or with a DPoP proof. The recorder, after it, sees the
+// request as it goes out, so the page can show it.
+builder.Services.AddHttpClient(Api.HttpClientName, client => client.BaseAddress = apiUrl)
+    .AddUserAccessTokenHandler(Schemes.Cookie)
+    .AddHttpMessageHandler(services => new ExchangeRecorder(services.GetRequiredService<IHttpContextAccessor>()));
+
+// The same API without the token handler, for the buttons that play the attacker.
+builder.Services.AddHttpClient(Api.RawHttpClientName, client => client.BaseAddress = apiUrl)
+    .AddHttpMessageHandler(services => new ExchangeRecorder(services.GetRequiredService<IHttpContextAccessor>()));
 
 var app = builder.Build();
 

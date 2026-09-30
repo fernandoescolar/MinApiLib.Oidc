@@ -8,7 +8,8 @@ public sealed record CallApiPage() : GetHandlerAsync<CallApiPage.Request>("/call
     public readonly record struct Request(
         HttpContext HttpContext,
         [FromQuery] string? Mode,
-        [FromServices] IHttpClientFactory HttpClients);
+        [FromServices] IHttpClientFactory HttpClients,
+        [FromServices] IUserAccessTokenManager Tokens);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
@@ -18,13 +19,10 @@ public sealed record CallApiPage() : GetHandlerAsync<CallApiPage.Request>("/call
             return Results.Redirect("/");
         }
 
-        var properties = result.Properties!;
-        var accessToken = properties.GetTokenValue("access_token")!;
-        var tokenType = properties.GetTokenValue("token_type") ?? "Bearer";
-        using var key = properties.Items.TryGetValue(DPoPKey.PropertyName, out var keyJson) && keyJson != null ? DPoPKey.FromJson(keyJson) : null;
+        var tokenType = result.Properties!.GetTokenValue("token_type") ?? "Bearer";
         var mode = request.Mode ?? "normal";
 
-        var exchanges = await Api.CallAsync(request.HttpClients.CreateClient(Api.HttpClientName), accessToken, tokenType, key, mode, cancellationToken);
+        var exchanges = await Api.CallAsync(request.HttpContext, request.HttpClients, request.Tokens, mode, cancellationToken);
 
         var body = new StringBuilder();
         body.Append(CultureInfo.InvariantCulture, $"""<p>{Html.Encode(Describe(mode, tokenType))}</p><p class="actions"><a href="/">Back</a></p>""");
