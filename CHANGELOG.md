@@ -50,7 +50,7 @@ Read this before you move a host from IdentityServer4 4.1.2:
   - Packages ship Source Link with `.snupkg` symbols, XML documentation and a README.
   - `LICENSE` and `NOTICE` carry the Apache-2.0 attribution to Brock Allen and Dominick Baier.
 - **Strong naming.** Assemblies are no longer strong-name signed.
-- **New `MinApiLib.OidcServer` package.** A new implementation derived from this fork, in one package with no
+- **New `MinApiLib.Oidc.Server` package.** A new implementation derived from this fork, in one package with no
   dependency on the `IdentityServer` packages.
   - The protocol endpoints are [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records for the
     HTTP methods each one supports (`POST /connect/token`, `GET /.well-known/openid-configuration`, ...), mapped
@@ -58,17 +58,22 @@ Read this before you move a host from IdentityServer4 4.1.2:
   - The default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute.
   - The code is organized in vertical slices: one folder and namespace per feature (`Features/Tokens`,
     `Features/Authorize`, ...) and a shared `Core`.
-  - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.OidcServer.Features.*` and
-    `MinApiLib.OidcServer.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
-    runs against it in `tests/MinApiLib.OidcServer.IntegrationTests`.
-- **New `MinApiLib.OidcServer.MongoDB` package.** MongoDB stores for clients, resources, CORS origins, persisted
+  - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.Oidc.Server.Features.*` and
+    `MinApiLib.Oidc.Server.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
+    runs against it in `tests/MinApiLib.Oidc.Server.IntegrationTests`.
+- **New `MinApiLib.Oidc.Server.MongoDB` package.** MongoDB stores for clients, resources, CORS origins, persisted
   grants, device codes and the signing keys of automatic key management, with TTL indexes that expire grants and
   device codes. Its tests run against MongoDB in Docker (Testcontainers).
-- **New `MinApiLib.OidcServer.Client` package.** `HttpClient` handlers that send access tokens, for any OpenID
-  Connect server: client credentials tokens (`AddClientCredentialsTokens`, `AddClientCredentialsTokenHandler`) and
-  the signed-in user's tokens (`AddOpenIdConnectTokens`, `AddUserAccessTokenHandler`), as bearer tokens or
-  DPoP-bound. It caches and renews client tokens, refreshes user tokens and updates the session, binds the
-  authorization code to the DPoP key (`dpop_jkt`) and handles `DPoP-Nonce`.
+- **New client packages.** `HttpClient` handlers that send access tokens, for any OpenID Connect server, as bearer
+  tokens or DPoP-bound, handling `DPoP-Nonce`:
+  - `MinApiLib.Oidc.Http`, without ASP.NET Core: client credentials tokens (`AddClientCredentialsTokens`,
+    `AddClientCredentialsTokenHandler`), cached and renewed, and the `AccessTokenHandler` and `TokenEndpointClient`
+    to build other handlers on.
+  - `MinApiLib.Oidc.Authentication`: the signed-in user's tokens (`AddOpenIdConnectTokens`,
+    `AddUserAccessTokenHandler`). It refreshes them, updates the session and binds the authorization code to the
+    DPoP key (`dpop_jkt`).
+- **New `MinApiLib.Oidc.DPoP` package.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
+  shared by the client packages and `MinApiLib.Oidc.Server`.
 - **Samples.** `samples/` has a server, a web client, an API and a worker that show the code flow, client
   credentials and API calls with bearer and DPoP-bound access tokens, in memory or on MongoDB.
 

@@ -4,6 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MinApiLib.Endpoints" />
-    <ProjectReference Include="..\..\src\MinApiLib.OidcServer.Client\MinApiLib.OidcServer.Client.csproj" />
+    <ProjectReference Include="..\..\src\MinApiLib.Oidc.Authentication\MinApiLib.Oidc.Authentication.csproj" />
   </ItemGroup>
 </Project>

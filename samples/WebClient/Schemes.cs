@@ -12,5 +12,5 @@ public static class Schemes
 
     /// <summary>The OpenID Connect scheme that signed the user in, which AddOpenIdConnectTokens records in the session.</summary>
     public static string? Of(AuthenticationProperties? properties)
-        => properties?.Items.TryGetValue(OidcClientDefaults.SchemeProperty, out var scheme) == true ? scheme : null;
+        => properties?.Items.TryGetValue(OpenIdConnectTokenDefaults.SchemeProperty, out var scheme) == true ? scheme : null;
 }

@@ -20,9 +20,11 @@ A full assessment of the code base and the roadmap for the fork is in
 | `IdentityServer.IdentityModel` | OpenID Connect / OAuth 2.0 constants and helpers (`OidcConstants`, `JwtClaimTypes`, `CryptoRandom`), derived from IdentityModel 7.0.0; replaces the external `IdentityModel` package |
 | `IdentityServer.Storage` | Store abstractions and in-memory stores |
 | `IdentityServer.AspNetIdentity` | ASP.NET Core Identity integration |
-| `MinApiLib.OidcServer` | A new implementation derived from this fork, in a single package: the endpoints are [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records and the services are registered with MinApiLib's dependency injection attribute. It does not depend on any `IdentityServer` package. See [its README](src/MinApiLib.OidcServer/README.md) |
-| `MinApiLib.OidcServer.MongoDB` | MongoDB stores for `MinApiLib.OidcServer`: clients, resources, grants, device codes and signing keys. See [its README](src/MinApiLib.OidcServer.MongoDB/README.md) |
-| `MinApiLib.OidcServer.Client` | Access tokens for `HttpClient`, for any OpenID Connect server: client credentials and the signed-in user's tokens, as bearer or DPoP-bound tokens, with caching, refresh and DPoP nonces. See [its README](src/MinApiLib.OidcServer.Client/README.md) |
+| `MinApiLib.Oidc.Server` | A new implementation derived from this fork, in a single package: the endpoints are [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records and the services are registered with MinApiLib's dependency injection attribute. It does not depend on any `IdentityServer` package. See [its README](src/MinApiLib.Oidc.Server/README.md) |
+| `MinApiLib.Oidc.Server.MongoDB` | MongoDB stores for `MinApiLib.Oidc.Server`: clients, resources, grants, device codes and signing keys. See [its README](src/MinApiLib.Oidc.Server.MongoDB/README.md) |
+| `MinApiLib.Oidc.DPoP` | DPoP (RFC 9449) keys, proofs, thumbprints, nonces and names, shared by the clients and the server. See [its README](src/MinApiLib.Oidc.DPoP/README.md) |
+| `MinApiLib.Oidc.Http` | Access tokens for `HttpClient`, without ASP.NET Core: client credentials tokens, as bearer or DPoP-bound tokens, with caching, renewal and DPoP nonces. See [its README](src/MinApiLib.Oidc.Http/README.md) |
+| `MinApiLib.Oidc.Authentication` | The signed-in user's OpenID Connect tokens for `HttpClient` in ASP.NET Core, as bearer or DPoP-bound tokens, refreshed and kept in the session. See [its README](src/MinApiLib.Oidc.Authentication/README.md) |
 
 ## Hosting
 
@@ -135,10 +137,10 @@ an Azure Artifacts feed (the feed name is a placeholder to fill in).
 
 ## Samples
 
-[samples/](samples/README.md) has a server built with `MinApiLib.OidcServer` (in memory or on MongoDB), a web
+[samples/](samples/README.md) has a server built with `MinApiLib.Oidc.Server` (in memory or on MongoDB), a web
 client, an API and a worker. The web client signs the user in and calls the API with the user's access token, and
-the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. Both use
-`MinApiLib.OidcServer.Client` and show each HTTP request and response.
+the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. They use
+`MinApiLib.Oidc.Authentication` and `MinApiLib.Oidc.Http` and show each HTTP request and response.
 
 ## Changes from IdentityServer4
 
@@ -162,4 +164,4 @@ IdentityServer is built using the following great open source projects:
 * [MinVer](https://github.com/adamralph/minver)
 * [xUnit](https://xunit.net/)
 * [IdentityModel](https://github.com/IdentityModel/IdentityModel) (the source of `IdentityServer.IdentityModel`)
-* [MinApiLib](https://github.com/fernandoescolar/MinApiLib) (endpoints and dependency injection of `MinApiLib.OidcServer`)
+* [MinApiLib](https://github.com/fernandoescolar/MinApiLib) (endpoints and dependency injection of `MinApiLib.Oidc.Server`)

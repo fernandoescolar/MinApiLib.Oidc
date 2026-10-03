@@ -1,10 +1,11 @@
 # Samples
 
 Applications that show a web application signing a user in with
-[MinApiLib.OidcServer](../src/MinApiLib.OidcServer/README.md) and then calling an API with the user's access token,
+[MinApiLib.Oidc.Server](../src/MinApiLib.Oidc.Server/README.md) and then calling an API with the user's access token,
 and a background worker calling the same API with its own token. The token is either a plain **bearer** token or a
 **DPoP**-bound token (proof of possession, [RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)). The web client and the
-worker get and send their tokens with [MinApiLib.OidcServer.Client](../src/MinApiLib.OidcServer.Client/README.md).
+worker get and send their tokens with [MinApiLib.Oidc.Authentication](../src/MinApiLib.Oidc.Authentication/README.md)
+and [MinApiLib.Oidc.Http](../src/MinApiLib.Oidc.Http/README.md).
 
 | Application | URL | What it does |
 |---|---|---|
@@ -64,7 +65,7 @@ dotnet run --project Server --launch-profile https-mongo
 ```
 
 The server keeps its configuration, grants and signing keys in the `oidcserver-sample` database, using
-[MinApiLib.OidcServer.MongoDB](../src/MinApiLib.OidcServer.MongoDB/README.md). It writes the clients and resources
+[MinApiLib.Oidc.Server.MongoDB](../src/MinApiLib.Oidc.Server.MongoDB/README.md). It writes the clients and resources
 of [Config.cs](Server/Config.cs) at startup. To use another MongoDB, set the `ConnectionStrings__Mongo`
 environment variable instead of using the profile.
 

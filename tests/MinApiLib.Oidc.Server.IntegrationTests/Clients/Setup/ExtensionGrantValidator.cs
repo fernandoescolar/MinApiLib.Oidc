@@ -1,0 +1,33 @@
+namespace MinApiLib.Oidc.Server.IntegrationTests.Clients.Setup;
+
+public class ExtensionGrantValidator : IExtensionGrantValidator
+{
+    public Task ValidateAsync(ExtensionGrantValidationContext context)
+    {
+        var credential = context.Request.Raw.Get("custom_credential");
+        var extraClaim = context.Request.Raw.Get("extra_claim");
+
+        if (credential != null)
+        {
+            if (extraClaim != null)
+            {
+                context.Result = new GrantValidationResult(
+                    subject: "818727",
+                    claims: new[] { new Claim("extra_claim", extraClaim) },
+                    authenticationMethod: GrantType);
+            }
+            else
+            {
+                context.Result = new GrantValidationResult(subject: "818727", authenticationMethod: GrantType);
+            }
+        }
+        else
+        {
+            context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant, "invalid_custom_credential");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public string GrantType => "custom";
+}

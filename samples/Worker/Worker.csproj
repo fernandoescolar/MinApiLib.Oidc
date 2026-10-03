@@ -4,7 +4,8 @@
     <RootNamespace>Samples.Worker</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\MinApiLib.OidcServer.Client\MinApiLib.OidcServer.Client.csproj" />
+    <ProjectReference Include="..\..\src\MinApiLib.Oidc.Http\MinApiLib.Oidc.Http.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />

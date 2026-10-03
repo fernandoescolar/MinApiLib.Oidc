@@ -1,0 +1,14 @@
+namespace MinApiLib.Oidc.Server.Features.UserInfo;
+
+/// <summary>
+/// Validator for userinfo requests
+/// </summary>
+public interface IUserInfoRequestValidator
+{
+    /// <summary>
+    /// Validates a userinfo request.
+    /// </summary>
+    /// <param name="accessToken">The access token.</param>
+    /// <returns></returns>
+    Task<UserInfoRequestValidationResult> ValidateRequestAsync(string accessToken);
+}

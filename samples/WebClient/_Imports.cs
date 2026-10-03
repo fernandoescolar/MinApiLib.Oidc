@@ -11,7 +11,6 @@ global using Microsoft.IdentityModel.JsonWebTokens;
 global using Microsoft.IdentityModel.Tokens;
 
 global using MinApiLib.Endpoints;
-global using MinApiLib.OidcServer.Client;
-global using MinApiLib.OidcServer.Client.DPoP;
-global using MinApiLib.OidcServer.Client.OpenIdConnect;
-global using MinApiLib.OidcServer.Client.Tokens;
+global using MinApiLib.Oidc.DPoP;
+global using MinApiLib.Oidc.Authentication;
+global using MinApiLib.Oidc.Http;

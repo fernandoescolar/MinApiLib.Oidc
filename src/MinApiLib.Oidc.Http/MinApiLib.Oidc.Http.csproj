@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Access tokens for HttpClient without ASP.NET Core: client credentials tokens sent as bearer tokens or DPoP-bound (RFC 9449), with caching, renewal and DPoP nonces, plus the token endpoint client and the handler base that MinApiLib.Oidc.Authentication builds on. Works with any OAuth 2.0 server.</Description>
+    <Product>MinApiLib.Oidc</Product>
+    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;OIDC;DPoP;Proof of possession;HttpClient;Access token;Client credentials;MinApiLib</PackageTags>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MinApiLib.Oidc.DPoP\MinApiLib.Oidc.DPoP.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The package ships its own README instead of the repository's. -->
+    <None Remove="$(RepoRoot)README.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>MinApiLib.Oidc.Http.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -48,7 +48,7 @@ public static class Api
             request.Headers.TryAddWithoutValidation("Authorization", $"{scheme} {token.Value}");
             if (proof != null)
             {
-                request.Headers.Add(DPoPProof.HeaderName, proof);
+                request.Headers.Add(DPoPConstants.HeaderName, proof);
             }
 
             using var response = await raw.SendAsync(request, cancellationToken);

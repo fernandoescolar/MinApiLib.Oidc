@@ -15,7 +15,7 @@ builder.Services
     .AddOpenIdConnect(Schemes.Bearer, options => Oidc.Configure(options, builder.Configuration, "web", suffix: string.Empty))
     .AddOpenIdConnect(Schemes.DPoP, options => Oidc.Configure(options, builder.Configuration, "web.dpop", suffix: "-dpop"));
 
-// MinApiLib.OidcServer.Client keeps the user's tokens in the session and refreshes them. For the DPoP scheme, it
+// MinApiLib.Oidc.Authentication keeps the user's tokens in the session and refreshes them. For the DPoP scheme, it
 // creates a key for each sign-in, binds the authorization code to it (dpop_jkt) and adds a proof of it to the code
 // redemption, the refreshes and every API call.
 builder.Services.AddOpenIdConnectTokens(Schemes.Bearer);

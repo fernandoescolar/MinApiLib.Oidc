@@ -21,7 +21,7 @@ public sealed class ExchangeRecorder(IHttpContextAccessor httpContextAccessor) :
         {
             await response.Content.LoadIntoBufferAsync(cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            var proof = request.Headers.TryGetValues(DPoPProof.HeaderName, out var values) ? values.First() : null;
+            var proof = request.Headers.TryGetValues(DPoPConstants.HeaderName, out var values) ? values.First() : null;
             var challenge = response.Headers.WwwAuthenticate.Count == 0 ? null : string.Join(", ", response.Headers.WwwAuthenticate);
 
             if (http.Items[ItemName] is not List<Exchange> exchanges)

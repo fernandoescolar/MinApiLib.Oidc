@@ -41,7 +41,7 @@ Discovery announces the accepted algorithms in `dpop_signing_alg_values_supporte
 
 The [samples](../../samples/README.md) run this exchange: a web client signs in with DPoP and calls an API, and its
 pages show each request and response. On the client side,
-[MinApiLib.OidcServer.Client](../../src/MinApiLib.OidcServer.Client/README.md) does steps 1 to 5 for you, with any
+[MinApiLib.Oidc.Authentication](../../src/MinApiLib.Oidc.Authentication/README.md) does steps 1 to 5 for you, with any
 `HttpClient`.
 
 The example follows a web application, the client `web.dpop`, that signs a user in with the authorization code

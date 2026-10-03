@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-using MinApiLib.OidcServer.Client.ClientCredentials;
+using MinApiLib.Oidc.Http.ClientCredentials;
 
 using Samples.Worker;
 
@@ -14,7 +14,7 @@ var apiUrl = new Uri(builder.Configuration["ApiUrl"]!);
 
 foreach (var (name, clientId, useDPoP) in new[] { ("bearer", "worker", false), ("dpop", "worker.dpop", true) })
 {
-    // The client: MinApiLib.OidcServer.Client finds the token endpoint in the discovery document, asks for a token,
+    // The client: MinApiLib.Oidc.Http finds the token endpoint in the discovery document, asks for a token,
     // caches it until shortly before it expires and, with UseDPoP, creates a key and binds the token to it.
     builder.Services.AddClientCredentialsTokens(name, options =>
     {

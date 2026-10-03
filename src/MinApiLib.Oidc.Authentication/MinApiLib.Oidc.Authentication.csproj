@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>The signed-in user's access tokens for HttpClient in ASP.NET Core: keeps the tokens of an OpenID Connect scheme in the session, refreshes them and sends them as bearer tokens or DPoP-bound (RFC 9449), with the authorization code bound to the key (dpop_jkt). Works with any OpenID Connect server.</Description>
+    <Product>MinApiLib.Oidc</Product>
+    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;OIDC;DPoP;Proof of possession;HttpClient;Access token;Refresh token;ASP.NET Core;MinApiLib</PackageTags>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\MinApiLib.Oidc.Http\MinApiLib.Oidc.Http.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The package ships its own README instead of the repository's. -->
+    <None Remove="$(RepoRoot)README.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>MinApiLib.Oidc.Authentication.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

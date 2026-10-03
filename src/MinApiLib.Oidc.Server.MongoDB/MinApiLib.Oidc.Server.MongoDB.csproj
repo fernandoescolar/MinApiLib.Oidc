@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>MongoDB stores for MinApiLib.Oidc.Server: clients, resources, CORS origins, persisted grants, device codes and signing keys, with TTL indexes that expire grants and device codes.</Description>
+    <Product>MinApiLib.Oidc</Product>
+    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;OIDC;MongoDB;MinApiLib</PackageTags>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MinApiLib.Oidc.Server\MinApiLib.Oidc.Server.csproj" />
+    <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The package ships its own README instead of the repository's. -->
+    <None Remove="$(RepoRoot)README.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
