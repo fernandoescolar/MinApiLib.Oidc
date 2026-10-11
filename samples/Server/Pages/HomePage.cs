@@ -7,6 +7,7 @@ public sealed record HomePage() : GetHandler("/")
         <ul>
           <li><a href="/.well-known/openid-configuration">Discovery document</a></li>
           <li><a href="/.well-known/openid-configuration/jwks">Signing keys (JWKS)</a></li>
+          <li><a href="/account/passkeys">Your passkeys</a>: sign in with a password and add a passkey</li>
         </ul>
         <p class="muted">Users: <code>alice</code> / <code>alice</code> and <code>bob</code> / <code>bob</code>.</p>
         """);

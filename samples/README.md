@@ -9,7 +9,7 @@ and [MinApiLib.Oidc.Http](../src/MinApiLib.Oidc.Http/README.md).
 
 | Application | URL | What it does |
 |---|---|---|
-| [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login, logout and error pages. In memory, or on MongoDB |
+| [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login (password or passkey), passkey, logout and error pages. In memory, or on MongoDB |
 | [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application: OpenID Connect login (code flow with PKCE), calls the API with the user's token |
 | [Api](Api) | https://localhost:5003 | Orders API: validates the access token and, for DPoP, the proof |
 | [Worker](Worker) | | Console application: calls the API with its own token (client credentials) and prints each request |
@@ -71,7 +71,8 @@ environment variable instead of using the profile.
 
 ## What to try
 
-The home page of the web client has two buttons. Both sign in the same user, through two clients of the server.
+The home page of the web client has two sign-in buttons. Both sign in the same user, through two clients of the server.
+A third one signs in with a passkey (see [Passkeys](#passkeys)).
 
 ### Sign in (Bearer)
 
@@ -145,10 +146,34 @@ HTTP/1.1 200 OK
 { "user": null, "client": "worker.dpop", "tokenScheme": "DPoP", "boundToKey": "T-98tzp8BzD9FCouaCQ28btQdYTmw_igGv9TXJmQdVo", ... }
 ```
 
+### Passkeys
+
+The server's users live in ASP.NET Core Identity ([Users/](Server/Users)), which since .NET 10 handles passkeys
+(WebAuthn): `IPasskeyHandler` makes the options for the browser and checks its answers, signature, challenge, origin
+and counter included. The server keeps the state of each ceremony in an encrypted cookie for five minutes
+([PasskeyState.cs](Server/Passkeys/PasskeyState.cs)).
+
+1. Open https://localhost:5001/account/passkeys, sign in as `bob` / `bob` and click **Add a passkey**. The browser
+   creates it with the device's authenticator or your password manager.
+2. On the web client, click **Sign in with a passkey (DPoP, `acr_values=phr`)**. The client asks for a
+   phishing-resistant sign-in, so the server's login page only offers the passkey and refuses a password.
+3. Back on the web client, the home page shows how the user signed in, from the identity token:
+   `amr` = `hwk, mfa` (a key on this device, and the authenticator verified the user) and `acr` = `phr`. A synced
+   passkey says `swk` instead of `hwk`. The access token carries the same claims, for the API.
+
+The normal login page offers the passkey too, as a button and in the user name field's autofill. The sign-in with
+the key happens in [PasskeyEndpoints.cs](Server/Pages/PasskeyEndpoints.cs), and [Login.cs](Server/Login.cs) decides
+`amr` and `acr`. The web client keeps `acr` with `options.ClaimActions.Remove("acr")`, because the OpenID Connect
+handler drops it by default.
+
+The sample keeps users and passkeys in memory: a restart forgets the passkeys, so also remove them from the browser
+or password manager.
+
 ## What the samples leave out
 
 They are kept short to show the protocol. A real deployment also needs:
 
-- a real user store, such as ASP.NET Core Identity, and a consent page if clients require consent;
+- a persistent user store, such as the Entity Framework Core stores of ASP.NET Core Identity, and a consent page if
+  clients require consent;
 - a persistent store for production. The in-memory one loses grants on restart; use the MongoDB stores or your own;
 - a distributed replay cache in the API when it runs on several instances. The sample uses `IMemoryCache`.

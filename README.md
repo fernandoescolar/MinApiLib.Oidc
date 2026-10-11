@@ -140,7 +140,8 @@ an Azure Artifacts feed (the feed name is a placeholder to fill in).
 [samples/](samples/README.md) has a server built with `MinApiLib.Oidc.Server` (in memory or on MongoDB), a web
 client, an API and a worker. The web client signs the user in and calls the API with the user's access token, and
 the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. They use
-`MinApiLib.Oidc.Authentication` and `MinApiLib.Oidc.Http` and show each HTTP request and response.
+`MinApiLib.Oidc.Authentication` and `MinApiLib.Oidc.Http` and show each HTTP request and response. The server's login
+accepts passwords and passkeys (ASP.NET Core Identity).
 
 ## Changes from IdentityServer4
 

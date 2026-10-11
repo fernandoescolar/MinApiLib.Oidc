@@ -20,7 +20,10 @@ public static class Html
             h1 { font-size: 1.4rem; } label { display: block; margin: .8rem 0 .2rem; }
             input { padding: .4rem; width: 100%; box-sizing: border-box; }
             button { margin-top: 1rem; padding: .5rem 1rem; }
-            .error { color: #b42318; } .muted { color: #59636e; } code { background: #f2f4f7; padding: 0 .2rem; }
+            .error { color: #b42318; } .ok { color: #1a7f37; } .muted { color: #59636e; } code { background: #f2f4f7; padding: 0 .2rem; }
+            hr { margin: 1.5rem 0; border: 0; border-top: 1px solid #d0d7de; }
+            table { width: 100%; border-collapse: collapse; margin: 1rem 0; } th, td { text-align: left; padding: .3rem; border-bottom: 1px solid #d0d7de; }
+            td form button { margin: 0; padding: .2rem .6rem; }
           </style>
         </head>
         <body>

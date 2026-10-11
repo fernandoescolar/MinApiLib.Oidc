@@ -75,7 +75,9 @@ Read this before you move a host from IdentityServer4 4.1.2:
 - **New `MinApiLib.Oidc.DPoP` package.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
   shared by the client packages and `MinApiLib.Oidc.Server`.
 - **Samples.** `samples/` has a server, a web client, an API and a worker that show the code flow, client
-  credentials and API calls with bearer and DPoP-bound access tokens, in memory or on MongoDB.
+  credentials and API calls with bearer and DPoP-bound access tokens, in memory or on MongoDB. The server's users
+  are in ASP.NET Core Identity and sign in with a password or a passkey; a client that asks for `acr_values=phr` gets
+  a passkey-only sign-in, and the tokens carry `amr` and `acr`.
 
 ### Hosting
 

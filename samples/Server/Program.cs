@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Samples.Server;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,7 +28,25 @@ else
     builder.Services.AddHostedService(sp => new MongoSeeder(sp.GetRequiredService<OidcServerMongoContext>(), webClientUrl));
 }
 
-builder.Services.AddSingleton<UserStore>();
+// The users, with ASP.NET Core Identity: password hashes and passkeys. The passkey handler makes the WebAuthn options
+// and checks the browser's answers; the login page signs the user in to the server's cookie (Login.cs).
+builder.Services.AddIdentityCore<SampleUser>()
+    .AddUserStore<SampleUserStore>();
+builder.Services.TryAddScoped<IPasskeyHandler<SampleUser>, PasskeyHandler<SampleUser>>();
+builder.Services.Configure<IdentityPasskeyOptions>(options =>
+{
+    // Discoverable passkeys, so the user signs in without typing a user name.
+    options.ResidentKeyRequirement = "required";
+    options.UserVerificationRequirement = "preferred";
+
+    // The browser must be on this server's origin, port included: https://localhost:5001 in the sample. The default
+    // check rejects that origin here, so the sample states the rule.
+    options.ValidateOrigin = context => ValueTask.FromResult(
+        !context.CrossOrigin &&
+        string.Equals(context.Origin, $"{context.HttpContext.Request.Scheme}://{context.HttpContext.Request.Host}", StringComparison.OrdinalIgnoreCase));
+});
+builder.Services.AddSingleton<SampleUserDirectory>();
+builder.Services.AddSingleton<PasskeyState>();
 builder.Services.AddAntiforgery();
 
 var app = builder.Build();
