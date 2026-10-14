@@ -184,6 +184,12 @@ internal static partial class ResponseAndHostingLog
     [LoggerMessage(0x6634, LogLevel.Information, "Showing login: Requested MaxAge exceeded.")]
     public static partial void ShowingLoginMaxAgeExceeded(ILogger logger);
 
+    [LoggerMessage(0x6654, LogLevel.Information, "Showing login: the session's acr ({acr}) is not one of the requested acr_values ({acrValues})")]
+    public static partial void ShowingLoginAcrValuesNotMet(ILogger logger, string? acr, string acrValues);
+
+    [LoggerMessage(0x6655, LogLevel.Information, "The sign-in did not meet the requested acr_values ({acrValues}): the session's acr is {acr}")]
+    public static partial void AcrValuesNotMet(ILogger logger, string? acr, string acrValues);
+
     [LoggerMessage(0x6635, LogLevel.Information, "Showing login: User logged in locally, but client does not allow local logins")]
     public static partial void ShowingLoginLocalLoginNotAllowed(ILogger logger);
 

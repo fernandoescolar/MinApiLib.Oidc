@@ -112,6 +112,12 @@ internal static class Constants
         public const string Tenant = "tenant:";
 
         public static readonly string[] All = { HomeRealm, Tenant };
+
+        /// <summary>
+        /// Added to the request's parameters when the user is sent to the login page for its <c>acr_values</c>, so the
+        /// way back does not send the user there again. A client that sends it only gets the error sooner.
+        /// </summary>
+        public const string LoginShownParameter = "acr_login_shown";
     }
 
     public static readonly FrozenDictionary<string, int> ProtectedResourceErrorStatusCodes = new Dictionary<string, int>

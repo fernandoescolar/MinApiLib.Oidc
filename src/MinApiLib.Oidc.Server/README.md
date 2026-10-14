@@ -184,6 +184,14 @@ endpoint itself answered, with a 405 or, at the token, device authorization and 
 The protocol values are unchanged. These include the cookie names (`idsrv`, `idsrv.session`,
 `idsrv.external`), the routes, the token formats and the discovery document.
 
+One addition is off by default. With `options.Authentication.EnforceAcrValues`, the authorize endpoint requires the
+session's `acr` claim to be one of the request's `acr_values`; the `idp:` and `tenant:` values are not checked.
+Otherwise it sends the user to the login page once, which reads the values from the authorization context and can
+ask for a stronger sign-in (step-up). If the session still does not meet them on the way back, the client gets
+`unmet_authentication_requirements` at its redirect URI. Without it, as in IdentityServer, `acr_values` only reach
+the login page, and a user who already has a session gets tokens whatever the values ask for. Turn it on when the
+login page sets the `acr` claim of the sessions it creates.
+
 The repository's `IdentityServer.AspNetIdentity` integration and the unit test suite are not ported. The test
 users from `IdentityServer.Test` live in the integration test project
 (`tests/MinApiLib.Oidc.Server.IntegrationTests/TestUsers`).

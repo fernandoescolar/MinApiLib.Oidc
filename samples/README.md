@@ -156,7 +156,10 @@ and counter included. The server keeps the state of each ceremony in an encrypte
 1. Open https://localhost:5001/account/passkeys, sign in as `bob` / `bob` and click **Add a passkey**. The browser
    creates it with the device's authenticator or your password manager.
 2. On the web client, click **Sign in with a passkey (DPoP, `acr_values=phr`)**. The client asks for a
-   phishing-resistant sign-in, so the server's login page only offers the passkey and refuses a password.
+   phishing-resistant sign-in, so the server's login page only offers the passkey and refuses a password. The
+   server has `EnforceAcrValues` on, so the session you opened with a password in step 1 is not enough: the server
+   sends you to the login page again, and would answer `unmet_authentication_requirements` to the client if the
+   sign-in were still not a passkey.
 3. Back on the web client, the home page shows how the user signed in, from the identity token:
    `amr` = `hwk, mfa` (a key on this device, and the authenticator verified the user) and `acr` = `phr`. A synced
    passkey says `swk` instead of `hwk`. The access token carries the same claims, for the API.

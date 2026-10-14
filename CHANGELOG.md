@@ -61,6 +61,9 @@ Read this before you move a host from IdentityServer4 4.1.2:
   - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.Oidc.Server.Features.*` and
     `MinApiLib.Oidc.Server.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
     runs against it in `tests/MinApiLib.Oidc.Server.IntegrationTests`.
+  - `options.Authentication.EnforceAcrValues`, off by default, makes `acr_values` required: a session whose `acr`
+    is not one of them goes back to the login page once (step-up), and then the client gets
+    `unmet_authentication_requirements`, which is now returned to the client's redirect URI.
 - **New `MinApiLib.Oidc.Server.MongoDB` package.** MongoDB stores for clients, resources, CORS origins, persisted
   grants, device codes and the signing keys of automatic key management, with TTL indexes that expire grants and
   device codes. Its tests run against MongoDB in Docker (Testcontainers).

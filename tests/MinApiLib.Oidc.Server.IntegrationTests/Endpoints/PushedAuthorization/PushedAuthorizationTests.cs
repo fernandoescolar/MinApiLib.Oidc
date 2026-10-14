@@ -214,6 +214,35 @@ public class PushedAuthorizationTests : IDisposable
         Assert.NotNull(authorize.Code);
     }
 
+    [Theory]
+    [Trait("Category", Category)]
+    [InlineData("phr", true)]
+    [InlineData("pwd", false)]
+    public async Task Pushed_acr_values_step_up_once_and_then_succeed_or_fail(string acrAtLogin, bool succeeds)
+    {
+        _pipeline.Options.Authentication.EnforceAcrValues = true;
+        await _pipeline.LoginAsync("bob");
+        var parameters = DefaultParameters();
+        parameters.Add("acr_values", "phr");
+        var requestUri = await PushRequestUriAsync(parameters);
+
+        var user = new OidcServerUser("bob");
+        user.AdditionalClaims.Add(new Claim(JwtClaimTypes.AuthenticationContextClassReference, acrAtLogin));
+        _pipeline.Subject = user.CreatePrincipal();
+        var authorize = await AuthorizeWithRequestUriAsync("client1", requestUri);
+
+        Assert.True(_pipeline.LoginWasCalled);
+        Assert.NotNull(authorize);
+        if (succeeds)
+        {
+            Assert.NotNull(authorize.Code);
+        }
+        else
+        {
+            Assert.Equal(OidcConstants.AuthorizeErrors.UnmetAuthenticationRequirements, authorize.Error);
+        }
+    }
+
     [Fact]
     [Trait("Category", Category)]
     public async Task Client_that_requires_pushed_authorization_cannot_use_a_plain_authorize_request()

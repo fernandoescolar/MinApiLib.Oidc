@@ -8,6 +8,11 @@ var oidc = builder.Services.AddOidcServer(options =>
 {
     // Signing keys are created and rotated automatically: in MongoDB with the Mongo stores, in ./keys otherwise.
     options.KeyManagement.Enabled = true;
+
+    // A client that asks for acr_values=phr gets a passkey sign-in, even when the user already has a session with a
+    // password: the server sends the user back to the login page, and fails the request if the sign-in still is not
+    // phishing-resistant.
+    options.Authentication.EnforceAcrValues = true;
 });
 
 var mongo = builder.Configuration.GetConnectionString("Mongo");

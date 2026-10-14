@@ -61,4 +61,17 @@ public class AuthenticationOptions
     /// original HTTP request.
     /// </summary>
     public bool SendBackChannelLogoutNotificationsInBackground { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether the authorize endpoint requires the <c>acr_values</c> of a request: the session's
+    /// <c>acr</c> claim must be one of them. When it is not, the user is sent to the login page once, which reads the
+    /// values from the authorization context and can ask for a stronger sign-in (step-up). If the session still does
+    /// not meet them on the way back, the client gets <c>unmet_authentication_requirements</c>. The <c>idp:</c> and
+    /// <c>tenant:</c> values are not checked.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <c>false</c>: OpenID Connect Core makes <c>acr_values</c> a voluntary request, so the values only
+    /// reach the login page. Turn it on when the login page sets the <c>acr</c> claim of the sessions it creates.
+    /// </remarks>
+    public bool EnforceAcrValues { get; set; }
 }

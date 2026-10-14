@@ -57,7 +57,8 @@ internal class AuthorizeResult : IEndpointResult
             OidcConstants.AuthorizeErrors.AccountSelectionRequired or
             OidcConstants.AuthorizeErrors.LoginRequired or
             OidcConstants.AuthorizeErrors.ConsentRequired or
-            OidcConstants.AuthorizeErrors.InteractionRequired;
+            OidcConstants.AuthorizeErrors.InteractionRequired or
+            OidcConstants.AuthorizeErrors.UnmetAuthenticationRequirements;
 
         if (isSafeError)
         {

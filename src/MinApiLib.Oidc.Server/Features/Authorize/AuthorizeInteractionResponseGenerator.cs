@@ -47,6 +47,11 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
     protected readonly IAuthorizationNonceStore NonceStore;
 
     /// <summary>
+    /// The options.
+    /// </summary>
+    protected readonly OidcServerOptions Options;
+
+    /// <summary>
     /// The http context
     /// </summary>
     protected HttpContext HttpContext => _httpContextAccessor.HttpContext!;
@@ -60,14 +65,17 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
     /// <param name="profile">The profile.</param>
     /// <param name="nonceStore">The store of nonces issued by the nonce endpoint.</param>
     /// <param name="httpContextAccessor">The HTTP context accessor.</param>
+    /// <param name="options">The options.</param>
     public AuthorizeInteractionResponseGenerator(
         TimeProvider clock,
         ILogger<AuthorizeInteractionResponseGenerator> logger,
         IConsentService consent,
         IProfileService profile,
         IAuthorizationNonceStore nonceStore,
-        IHttpContextAccessor httpContextAccessor)
+        IHttpContextAccessor httpContextAccessor,
+        OidcServerOptions options)
     {
+        Options = options;
         Clock = clock;
         Logger = logger;
         Consent = consent;
@@ -116,7 +124,7 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
         {
             // A nonce sign-in establishes the session, but the target client's login policies
             // (max_age, IdentityProviderRestrictions, EnableLocalLogin, UserSsoLifetime) still apply.
-            result = await ProcessLoginAsync(request);
+            result = ProcessAcrValues(request, await ProcessLoginAsync(request));
         }
         if (!result.IsLogin && !result.IsError && !result.IsRedirect && !result.IsConsent)
         {
@@ -376,6 +384,57 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
         }
 
         return new InteractionResponse();
+    }
+
+    /// <summary>
+    /// With <see cref="Core.Configuration.AuthenticationOptions.EnforceAcrValues"/>, requires the session's <c>acr</c> to be one of the
+    /// request's <c>acr_values</c>: otherwise the user goes to the login page once, and if the session still does not
+    /// meet them on the way back, the request fails with <c>unmet_authentication_requirements</c>.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="login">The outcome of <see cref="ProcessLoginAsync"/>.</param>
+    protected internal virtual InteractionResponse ProcessAcrValues(ValidatedAuthorizeRequest request, InteractionResponse login)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(login);
+
+        if (!Options.Authentication.EnforceAcrValues || login.IsError || login.IsRedirect)
+        {
+            return login;
+        }
+
+        var requested = request.GetAcrValues().ToArray();
+        if (requested.Length == 0)
+        {
+            return login;
+        }
+
+        var loginShown = request.Raw.Get(Constants.KnownAcrValues.LoginShownParameter) != null;
+        if (login.IsLogin)
+        {
+            request.Raw[Constants.KnownAcrValues.LoginShownParameter] = "true";
+            return login;
+        }
+
+        var acr = request.Subject.FindFirst(JwtClaimTypes.AuthenticationContextClassReference)?.Value;
+        if (acr != null && requested.Contains(acr, StringComparer.Ordinal))
+        {
+            return login;
+        }
+
+        if (loginShown)
+        {
+            ResponseAndHostingLog.AcrValuesNotMet(Logger, acr, requested.ToSpaceSeparatedString());
+            return new InteractionResponse
+            {
+                Error = OidcConstants.AuthorizeErrors.UnmetAuthenticationRequirements,
+                ErrorDescription = "The sign-in does not meet the requested acr_values."
+            };
+        }
+
+        ResponseAndHostingLog.ShowingLoginAcrValuesNotMet(Logger, acr, requested.ToSpaceSeparatedString());
+        request.Raw[Constants.KnownAcrValues.LoginShownParameter] = "true";
+        return new InteractionResponse { IsLogin = true };
     }
 
     /// <summary>
