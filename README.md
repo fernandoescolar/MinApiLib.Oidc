@@ -24,6 +24,7 @@ A full assessment of the code base and the roadmap for the fork is in
 | `MinApiLib.Oidc.Server.MongoDB` | MongoDB stores for `MinApiLib.Oidc.Server`: clients, resources, grants, device codes and signing keys. See [its README](src/MinApiLib.Oidc.Server.MongoDB/README.md) |
 | `MinApiLib.Oidc.DPoP` | DPoP (RFC 9449) keys, proofs, thumbprints, nonces and names, shared by the clients and the server. See [its README](src/MinApiLib.Oidc.DPoP/README.md) |
 | `MinApiLib.Oidc.Http` | Access tokens for `HttpClient`, without ASP.NET Core: client credentials tokens, as bearer or DPoP-bound tokens, with caching, renewal and DPoP nonces. See [its README](src/MinApiLib.Oidc.Http/README.md) |
+| `MinApiLib.Oidc.JwtBearer` | DPoP for ASP.NET Core JWT bearer authentication: `AddJwtBearer().AddDPoP()` validates the proofs of DPoP-bound tokens, rejects them as bearer tokens, issues nonces and announces both schemes. See [its README](src/MinApiLib.Oidc.JwtBearer/README.md) |
 | `MinApiLib.Oidc.Authentication` | The signed-in user's OpenID Connect tokens for `HttpClient` in ASP.NET Core, as bearer or DPoP-bound tokens, refreshed and kept in the session. See [its README](src/MinApiLib.Oidc.Authentication/README.md) |
 
 ## Hosting

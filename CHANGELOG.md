@@ -76,7 +76,12 @@ Read this before you move a host from IdentityServer4 4.1.2:
     `AddUserAccessTokenHandler`). It refreshes them, updates the session and binds the authorization code to the
     DPoP key (`dpop_jkt`).
 - **New `MinApiLib.Oidc.DPoP` package.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
-  shared by the client packages and `MinApiLib.Oidc.Server`.
+  shared by the client packages and `MinApiLib.Oidc.Server`, and `DPoPProofValidator` with a replay cache for
+  servers that validate proofs.
+- **New `MinApiLib.Oidc.JwtBearer` package.** DPoP for APIs on ASP.NET Core JWT bearer authentication:
+  `AddJwtBearer().AddDPoP()` accepts `Authorization: DPoP`, validates the proof against `cnf.jkt`, rejects DPoP-bound
+  tokens sent as bearer tokens, can require DPoP-bound tokens only or API-issued nonces, and announces both schemes in
+  its challenges. The API sample uses it.
 - **Samples.** `samples/` has a server, a web client, an API and a worker that show the code flow, client
   credentials and API calls with bearer and DPoP-bound access tokens, in memory or on MongoDB. The server's users
   are in ASP.NET Core Identity and sign in with a password or a passkey; a client that asks for `acr_values=phr` gets

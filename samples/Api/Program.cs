@@ -1,10 +1,6 @@
 var builder = WebApplication.CreateBuilder(args);
 var authority = builder.Configuration["Authority"]!;
 
-builder.Services.AddMemoryCache();
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<DPoPProofValidator>();
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -15,10 +11,13 @@ builder.Services
         options.Audience = "orders";
         options.MapInboundClaims = false;
         options.TokenValidationParameters.ValidTypes = ["at+jwt"];
-
-        // Accepts "Authorization: DPoP <token>" and checks the DPoP proof of DPoP-bound tokens.
-        options.Events = new DPoPJwtBearerEvents();
-    });
+        options.Challenge = "Bearer realm=\"orders\"";
+    })
+    // MinApiLib.Oidc.JwtBearer: accepts "Authorization: DPoP <token>", checks the proof of DPoP-bound tokens against
+    // cnf.jkt, rejects them as bearer tokens and announces both schemes. options.Mode = DPoPTokenMode.Required would
+    // accept DPoP-bound tokens only, and options.RequireNonce = true would make clients put a nonce of the API in
+    // their proofs.
+    .AddDPoP();
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("orders.read", policy => policy.RequireAuthenticatedUser().RequireClaim("scope", "orders.read"));

@@ -24,6 +24,7 @@
     <Project Path="src/MinApiLib.Oidc.Authentication/MinApiLib.Oidc.Authentication.csproj" />
     <Project Path="src/MinApiLib.Oidc.DPoP/MinApiLib.Oidc.DPoP.csproj" />
     <Project Path="src/MinApiLib.Oidc.Http/MinApiLib.Oidc.Http.csproj" />
+    <Project Path="src/MinApiLib.Oidc.JwtBearer/MinApiLib.Oidc.JwtBearer.csproj" />
     <Project Path="src/MinApiLib.Oidc.Server/MinApiLib.Oidc.Server.csproj" />
     <Project Path="src/MinApiLib.Oidc.Server.MongoDB/MinApiLib.Oidc.Server.MongoDB.csproj" />
   </Folder>
@@ -43,6 +44,7 @@
     <Project Path="tests/MinApiLib.Oidc.Authentication.Tests/MinApiLib.Oidc.Authentication.Tests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.DPoP.Tests/MinApiLib.Oidc.DPoP.Tests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.Http.Tests/MinApiLib.Oidc.Http.Tests.csproj" />
+    <Project Path="tests/MinApiLib.Oidc.JwtBearer.Tests/MinApiLib.Oidc.JwtBearer.Tests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.Server.IntegrationTests/MinApiLib.Oidc.Server.IntegrationTests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.Server.MongoDB.Tests/MinApiLib.Oidc.Server.MongoDB.Tests.csproj" />
   </Folder>

@@ -2,7 +2,8 @@
 
 The building blocks of DPoP ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449), OAuth 2.0 Demonstrating Proof of
 Possession), shared by the clients ([MinApiLib.Oidc.Http](../MinApiLib.Oidc.Http/README.md),
-[MinApiLib.Oidc.Authentication](../MinApiLib.Oidc.Authentication/README.md)) and the server
+[MinApiLib.Oidc.Authentication](../MinApiLib.Oidc.Authentication/README.md)), the APIs
+([MinApiLib.Oidc.JwtBearer](../MinApiLib.Oidc.JwtBearer/README.md)) and the server
 ([MinApiLib.Oidc.Server](../MinApiLib.Oidc.Server/README.md)). It only depends on
 `Microsoft.IdentityModel.JsonWebTokens`, and targets `net10.0` and `net11.0`.
 
@@ -32,6 +33,21 @@ when given, the access token hash (`ath`) and the server's nonce. `DPoPProof.Has
 ## Nonces
 
 `DPoPNonceStore` keeps the last `DPoP-Nonce` each server sent, by origin, to put in the next proofs.
+
+## Validating proofs
+
+Servers check proofs with `DPoPProofValidator`: the form of the proof, its signature by the key in its header, the
+method and URL, its age, the access token hash, and that its `jti` was not seen before.
+
+```csharp
+var validator = new DPoPProofValidator(new DPoPProofValidationOptions(), new InMemoryDPoPReplayCache(TimeProvider.System), TimeProvider.System);
+var result = await validator.ValidateAsync(proof, "GET", requestUrl, accessToken);
+// result.IsValid, result.Error, result.Thumbprint (compare it with cnf.jkt), result.Nonce
+```
+
+`IDPoPReplayCache` remembers the accepted proofs. `InMemoryDPoPReplayCache` serves a single instance; APIs on several
+instances need a shared one, such as `DistributedDPoPReplayCache` in
+[MinApiLib.Oidc.JwtBearer](../MinApiLib.Oidc.JwtBearer/README.md), which does all of this for ASP.NET Core APIs.
 
 ## Names
 

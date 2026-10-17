@@ -11,7 +11,7 @@ and [MinApiLib.Oidc.Http](../src/MinApiLib.Oidc.Http/README.md).
 |---|---|---|
 | [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login (password or passkey), passkey, logout and error pages. In memory, or on MongoDB |
 | [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application: OpenID Connect login (code flow with PKCE), calls the API with the user's token |
-| [Api](Api) | https://localhost:5003 | Orders API: validates the access token and, for DPoP, the proof |
+| [Api](Api) | https://localhost:5003 | Orders API: validates the access token and, for DPoP, the proof, with `AddJwtBearer().AddDPoP()` |
 | [Worker](Worker) | | Console application: calls the API with its own token (client credentials) and prints each request |
 
 The web applications are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records.
@@ -111,8 +111,9 @@ and the API client with `AddUserAccessTokenHandler()` ([Program.cs](WebClient/Pr
    ```
 
 5. The API validates the token, then the proof: its signature with the `jwk` header, `htm`, `htu`, `iat`, `ath`, a
-   `jti` not seen before, and that the thumbprint of its key equals `cnf.jkt`
-   ([DPoPProofValidator.cs](Api/DPoP/DPoPProofValidator.cs), [DPoPJwtBearerEvents.cs](Api/DPoP/DPoPJwtBearerEvents.cs)).
+   `jti` not seen before, and that the thumbprint of its key equals `cnf.jkt`. That is
+   [MinApiLib.Oidc.JwtBearer](../src/MinApiLib.Oidc.JwtBearer/README.md), one line after `AddJwtBearer`
+   ([Program.cs](Api/Program.cs)).
 
 The access token lasts an hour. A minute before it expires, the library refreshes it with the refresh token and a
 proof of the same key, and writes the new tokens to the session cookie.
@@ -179,4 +180,5 @@ They are kept short to show the protocol. A real deployment also needs:
 - a persistent user store, such as the Entity Framework Core stores of ASP.NET Core Identity, and a consent page if
   clients require consent;
 - a persistent store for production. The in-memory one loses grants on restart; use the MongoDB stores or your own;
-- a distributed replay cache in the API when it runs on several instances. The sample uses `IMemoryCache`.
+- a distributed replay cache in the API when it runs on several instances (`DistributedDPoPReplayCache`). The sample
+  keeps the proofs it has seen in memory.

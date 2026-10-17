@@ -19,8 +19,8 @@ public sealed record OrdersEndpoint() : GetHandler<OrdersEndpoint.Request>("/ord
             user = user.FindFirst("sub")?.Value,
             name = user.FindFirst("name")?.Value,
             client = user.FindFirst("client_id")?.Value,
-            tokenScheme = http.Items[DPoPJwtBearerEvents.SchemeItem],
-            boundToKey = http.Items[DPoPJwtBearerEvents.ThumbprintItem],
+            tokenScheme = http.GetAccessTokenScheme(),
+            boundToKey = http.GetDPoPThumbprint(),
             orders = new[]
             {
                 new { id = 1001, total = 42.50m, status = "shipped" },

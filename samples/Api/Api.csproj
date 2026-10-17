@@ -3,7 +3,7 @@
     <RootNamespace>Samples.Api</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <ProjectReference Include="..\..\src\MinApiLib.Oidc.JwtBearer\MinApiLib.Oidc.JwtBearer.csproj" />
     <PackageReference Include="MinApiLib.Endpoints" />
   </ItemGroup>
 </Project>
