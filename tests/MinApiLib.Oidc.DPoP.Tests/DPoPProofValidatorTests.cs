@@ -49,12 +49,20 @@ public class DPoPProofValidatorTests
     [InlineData("old", "outside the accepted window")]
     [InlineData("future", "outside the accepted window")]
     [InlineData("malformed", "Malformed")]
+    [InlineData("bad-segments", "Malformed")]
+    [InlineData("path-case", "htu does not match")]
     public async Task Proof_for_another_request_or_time_is_rejected(string fault, string error)
     {
         var (validator, clock) = Create();
         using var key = DPoPKey.CreateECDsa();
         var issuedAt = fault switch { "old" => clock.Now.AddMinutes(-3), "future" => clock.Now.AddMinutes(3), _ => clock.Now };
-        var proof = fault == "malformed" ? "not-a-jwt" : DPoPProof.Create(key, HttpMethod.Get, fault == "url" ? new Uri("https://api.example/invoices") : Url, "token", issuedAt: issuedAt);
+        var proofUrl = fault switch { "url" => new Uri("https://api.example/invoices"), "path-case" => new Uri("https://api.example/Orders"), _ => Url };
+        var proof = fault switch
+        {
+            "malformed" => "not-a-jwt",
+            "bad-segments" => "eyJhbGciOiJFUzI1NiJ9.!!!.x",
+            _ => DPoPProof.Create(key, HttpMethod.Get, proofUrl, "token", issuedAt: issuedAt)
+        };
 
         var result = await validator.ValidateAsync(proof, fault == "method" ? "POST" : "GET", Url, fault == "token" ? "other-token" : "token", TestContext.Current.CancellationToken);
 

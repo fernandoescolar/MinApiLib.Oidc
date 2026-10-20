@@ -77,7 +77,9 @@ Read this before you move a host from IdentityServer4 4.1.2:
     DPoP key (`dpop_jkt`).
 - **New `MinApiLib.Oidc.DPoP` package.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
   shared by the client packages and `MinApiLib.Oidc.Server`, and `DPoPProofValidator` with a replay cache for
-  servers that validate proofs.
+  servers that validate proofs. The server's `DefaultDPoPProofValidator` and `MinApiLib.Oidc.JwtBearer` both use it,
+  so the token endpoint and the APIs check proofs the same way: `htu` matches with scheme and host case-insensitive
+  and the path exact.
 - **New `MinApiLib.Oidc.JwtBearer` package.** DPoP for APIs on ASP.NET Core JWT bearer authentication:
   `AddJwtBearer().AddDPoP()` accepts `Authorization: DPoP`, validates the proof against `cnf.jkt`, rejects DPoP-bound
   tokens sent as bearer tokens, can require DPoP-bound tokens only or API-issued nonces, and announces both schemes in

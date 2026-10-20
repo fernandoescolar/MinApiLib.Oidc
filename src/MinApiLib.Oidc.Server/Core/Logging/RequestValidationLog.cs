@@ -268,14 +268,8 @@ internal static partial class RequestValidationLog
 
     // DefaultDPoPProofValidator
 
-    [LoggerMessage(0x6050, LogLevel.Debug, "Malformed DPoP proof")]
-    public static partial void MalformedDPoPProof(ILogger logger, Exception exception);
-
-    [LoggerMessage(0x6051, LogLevel.Debug, "Invalid jwk in DPoP proof")]
-    public static partial void InvalidDPoPJwk(ILogger logger, Exception exception);
-
-    [LoggerMessage(0x6052, LogLevel.Debug, "DPoP proof signature validation failed")]
-    public static partial void DPoPSignatureValidationFailed(ILogger logger, Exception exception);
+    [LoggerMessage(0x6050, LogLevel.Debug, "DPoP proof rejected: {description}")]
+    public static partial void DPoPProofException(ILogger logger, string description, Exception exception);
 
     [LoggerMessage(0x6053, LogLevel.Information, "DPoP proof validation failed: {description}")]
     public static partial void DPoPValidationFailed(ILogger logger, string description);

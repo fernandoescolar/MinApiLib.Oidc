@@ -32,7 +32,10 @@ public sealed record DPoPProofValidationResult
     /// <summary>The <c>nonce</c> of the proof, for servers that issue nonces.</summary>
     public string? Nonce { get; init; }
 
-    internal static DPoPProofValidationResult Failed(string error) => new() { Error = error };
+    /// <summary>The exception behind <see cref="Error"/>, when reading the proof or checking its signature threw, for logging.</summary>
+    public Exception? Exception { get; init; }
+
+    internal static DPoPProofValidationResult Failed(string error, Exception? exception = null) => new() { Error = error, Exception = exception };
 }
 
 /// <summary>
@@ -58,15 +61,19 @@ public sealed class DPoPProofValidator(DPoPProofValidationOptions options, IDPoP
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(url);
+        if (!url.IsAbsoluteUri)
+        {
+            throw new ArgumentException("The request URL must be absolute.", nameof(url));
+        }
 
         JsonWebToken jwt;
         try
         {
             jwt = Handler.ReadJsonWebToken(proof);
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or SecurityTokenMalformedException)
         {
-            return DPoPProofValidationResult.Failed("Malformed DPoP proof");
+            return DPoPProofValidationResult.Failed("Malformed DPoP proof", ex);
         }
 
         // A proof: typ dpop+jwt, an accepted asymmetric algorithm and a public key in the jwk header.
@@ -90,9 +97,9 @@ public sealed class DPoPProofValidator(DPoPProofValidationOptions options, IDPoP
         {
             jwk = new JsonWebKey(jwkElement.GetRawText());
         }
-        catch (ArgumentException)
+        catch (Exception ex) when (ex is ArgumentException or JsonException)
         {
-            return DPoPProofValidationResult.Failed("DPoP proof has an invalid jwk header");
+            return DPoPProofValidationResult.Failed("DPoP proof has an invalid jwk header", ex);
         }
 
         if (jwk.HasPrivateKey || jwkElement.TryGetProperty("d", out _) || jwk.Kty is not (JsonWebAlgorithmsKeyTypes.EllipticCurve or JsonWebAlgorithmsKeyTypes.RSA))
@@ -114,7 +121,7 @@ public sealed class DPoPProofValidator(DPoPProofValidationOptions options, IDPoP
         });
         if (!signature.IsValid)
         {
-            return DPoPProofValidationResult.Failed("Invalid DPoP proof signature");
+            return DPoPProofValidationResult.Failed("Invalid DPoP proof signature", signature.Exception);
         }
 
         // For this request: method and URL, without query and fragment.
@@ -123,8 +130,7 @@ public sealed class DPoPProofValidator(DPoPProofValidationOptions options, IDPoP
             return DPoPProofValidationResult.Failed("DPoP proof htm does not match the request method");
         }
 
-        if (!jwt.TryGetPayloadValue<string>(DPoPConstants.Claims.HttpUrl, out var htu) || !Uri.TryCreate(htu, UriKind.Absolute, out var htuUrl) ||
-            Uri.Compare(htuUrl, url, UriComponents.SchemeAndServer | UriComponents.Path, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) != 0)
+        if (!jwt.TryGetPayloadValue<string>(DPoPConstants.Claims.HttpUrl, out var htu) || !UrlsMatch(htu, url))
         {
             return DPoPProofValidationResult.Failed("DPoP proof htu does not match the request URL");
         }
@@ -169,4 +175,15 @@ public sealed class DPoPProofValidator(DPoPProofValidationOptions options, IDPoP
             Nonce = jwt.TryGetPayloadValue<string>(DPoPConstants.Claims.Nonce, out var nonce) ? nonce : null
         };
     }
+
+    /// <summary>
+    /// RFC 9449 section 4.3 item 9: <c>htu</c> matches the request URL without query and fragment. Scheme and host are
+    /// compared case-insensitively, the path exactly.
+    /// </summary>
+    private static bool UrlsMatch(string htu, Uri url)
+        => Uri.TryCreate(htu, UriKind.Absolute, out var proofUrl) &&
+           string.Equals(proofUrl.Scheme, url.Scheme, StringComparison.OrdinalIgnoreCase) &&
+           string.Equals(proofUrl.Host, url.Host, StringComparison.OrdinalIgnoreCase) &&
+           proofUrl.Port == url.Port &&
+           string.Equals(proofUrl.AbsolutePath, url.AbsolutePath, StringComparison.Ordinal);
 }

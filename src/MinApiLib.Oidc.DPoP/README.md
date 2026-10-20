@@ -37,7 +37,9 @@ when given, the access token hash (`ath`) and the server's nonce. `DPoPProof.Has
 ## Validating proofs
 
 Servers check proofs with `DPoPProofValidator`: the form of the proof, its signature by the key in its header, the
-method and URL, its age, the access token hash, and that its `jti` was not seen before.
+method and URL, its age, the access token hash, and that its `jti` was not seen before. The token endpoint of
+[MinApiLib.Oidc.Server](../MinApiLib.Oidc.Server/README.md) and the APIs of
+[MinApiLib.Oidc.JwtBearer](../MinApiLib.Oidc.JwtBearer/README.md) use it, with the same rules and error messages.
 
 ```csharp
 var validator = new DPoPProofValidator(new DPoPProofValidationOptions(), new InMemoryDPoPReplayCache(TimeProvider.System), TimeProvider.System);
