@@ -168,7 +168,7 @@ dotnet_diagnostic.CA1031.severity = none
 # IDE0058: Remove unnecessary expression value _ = a.Do();
 dotnet_diagnostic.IDE0058.severity = none
 # CA1848: Use the LoggerMessage delegates. Library code logs only through [LoggerMessage] methods
-# (src/IdentityServer/Logging/*Log.cs and the LoggerExtensions classes); tests/.editorconfig relaxes it.
+# (the *Log.cs and LoggerExtensions classes); tests/.editorconfig relaxes it.
 dotnet_diagnostic.CA1848.severity = warning
 # CA2254: Template should be a static expression
 dotnet_diagnostic.CA2254.severity = warning

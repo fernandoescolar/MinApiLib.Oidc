@@ -50,11 +50,11 @@
   <PropertyGroup>
     <PackageId Condition="'$(IsSrcProject)' == 'true'">$(PackageIdPrefix)$(MSBuildProjectName)</PackageId>
     <IsPackable Condition="'$(IsSrcProject)' != 'true'">false</IsPackable>
-    <Product>IdentityServer (fork of IdentityServer4)</Product>
+    <Product>MinApiLib.Oidc</Product>
     <Copyright>Copyright (c) Brock Allen &amp; Dominick Baier; modifications Copyright (c) Fernando Escolar</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;Security;Identity;IdentityServer</PackageTags>
+    <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;OIDC;Security;MinApiLib</PackageTags>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <!-- Fill in once the repository has a remote (also drives SourceLink). -->
     <RepositoryUrl></RepositoryUrl>

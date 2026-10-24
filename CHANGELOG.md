@@ -1,73 +1,69 @@
 # Changelog
 
-This file summarises how this fork differs from
+This file summarises how MinApiLib.Oidc differs from
 [IdentityServer4 4.1.2](https://github.com/IdentityServer/IdentityServer4/tree/4.1.2), the last upstream release.
-No version of the fork has been published yet, so every change is listed under *Unreleased*. The detailed
-assessment behind these changes, in Spanish, is in
-[docs/analysis/2026-11-analisis-producto-y-mejoras.md](docs/analysis/2026-11-analisis-producto-y-mejoras.md).
+`MinApiLib.Oidc.Server` derives from it through an IdentityServer fork, which this repository keeps, archived, on the
+`archived/identity-server` branch; the protocol changes below come from that fork. No version has been published
+yet, so every change is listed under *Unreleased*.
 
 ## [Unreleased]
 
-### Migration checklist
+### Moving from IdentityServer4
 
-Read this before you move a host from IdentityServer4 4.1.2:
+Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.Server`:
 
-- Rename namespaces and packages from `IdentityServer4.*` to `IdentityServer.*`.
-- Replace `using IdentityModel;` with `using IdentityServer.IdentityModel;`. The fork no longer depends on the
-  `IdentityModel` package.
-- Map the endpoints. Call `app.MapIdentityServer()` as well as `app.UseIdentityServer()`; the middleware router is
-  gone.
+- Rename the API. `AddIdentityServer()`, `UseIdentityServer()` and `IdentityServerOptions` become `AddOidcServer()`,
+  `UseOidcServer()` and `OidcServerOptions`, and the `IdentityServer4.*` namespaces become
+  `MinApiLib.Oidc.Server.Features.*` and `MinApiLib.Oidc.Server.Core.*`, by feature. The
+  [server README](src/MinApiLib.Oidc.Server/README.md#differences-from-the-identityserver-fork) maps every name.
+- Replace `using IdentityModel;` with `using MinApiLib.Oidc.Server.Core.IdentityModel;`. The server does not depend
+  on the `IdentityModel` package.
+- Map the endpoints. Call `app.MapOidcServer()` as well as `app.UseOidcServer()`. Custom endpoints are MinApiLib
+  endpoint records instead of `IEndpointHandler`.
+- Bring your own ASP.NET Core Identity integration. There is no `AddAspNetIdentity<TUser>()`: implement
+  `IProfileService` (and `IResourceOwnerPasswordValidator`, if a client still uses the password grant) over your user
+  store. The sample server signs users in with ASP.NET Core Identity.
 - Opt in to deprecated flows. Clients that use the implicit flow, access tokens from the authorize endpoint, or the
   password grant need the new client flags (see [Deprecated flows](#deprecated-flows)).
 - Replace `ISystemClock` with `TimeProvider`.
 - Check persisted grants. They are serialized with System.Text.Json instead of Newtonsoft.Json; verify that grants
   stored by IdentityServer4 still deserialize, or let them expire, before switching a production store.
 - Fix invalid options. Startup fails on inconsistent options (see [Configuration](#configuration)).
-- Review [Changed behaviour](#changed-behaviour) and [Breaking API changes](#breaking-api-changes).
+- Review [Changed behaviour](#changed-behaviour) and [API changes](#api-changes).
 
-### Platform and packaging
+### Packages
 
 - **Target frameworks.**
   - Targets `net10.0` and `net11.0`, with C# `latest`.
   - Nullable reference types are enabled in every library.
   - The SDK is pinned in `global.json`.
-- **Packages.** `IdentityServer`, `IdentityServer.Models`, `IdentityServer.Storage`, `IdentityServer.AspNetIdentity`,
-  and the new `IdentityServer.IdentityModel`.
   - The package id prefix is configurable with `PackageIdPrefix`.
   - There are no Entity Framework packages, quickstart UI or templates.
-- **New `IdentityServer.IdentityModel` package.** It holds the protocol constants and helpers the server needs:
-  `OidcConstants`, `JwtClaimTypes`, `CryptoRandom`, `ClaimComparer`, and principal, X.509 and string helpers.
-  - It is derived from IdentityModel 7.0.0 (Apache-2.0), without the client library.
-  - It lives in its own namespace, `IdentityServer.IdentityModel`, so hosts can still reference `IdentityModel` or
-    `Duende.IdentityModel` for client code.
 - **Dependencies.**
   - Microsoft.IdentityModel 8.x replaces the vulnerable versions IdentityServer4 pinned.
   - System.Text.Json replaces Newtonsoft.Json.
   - `TimeProvider` replaces `ISystemClock`.
+  - The protocol constants and helpers the server needs (`OidcConstants`, `JwtClaimTypes`, `CryptoRandom`, ...)
+    are derived from IdentityModel 7.0.0 (Apache-2.0) and live in the server, in the
+    `MinApiLib.Oidc.Server.Core.IdentityModel` namespace, so hosts can still reference `IdentityModel` or
+    `Duende.IdentityModel` for client code.
 - **Builds and packaging.**
   - Builds are reproducible.
   - Versions come from git tags (MinVer).
   - Packages ship Source Link with `.snupkg` symbols, XML documentation and a README.
   - `LICENSE` and `NOTICE` carry the Apache-2.0 attribution to Brock Allen and Dominick Baier.
-- **Strong naming.** Assemblies are no longer strong-name signed.
-- **New `MinApiLib.Oidc.Server` package.** A new implementation derived from this fork, in one package with no
-  dependency on the `IdentityServer` packages.
-  - The protocol endpoints are [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records for the
-    HTTP methods each one supports (`POST /connect/token`, `GET /.well-known/openid-configuration`, ...), mapped
-    with `MapOidcServer()`. Other methods get a routing 405.
-  - The default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute.
-  - The code is organized in vertical slices: one folder and namespace per feature (`Features/Tokens`,
-    `Features/Authorize`, ...) and a shared `Core`.
-  - The API is renamed: `AddOidcServer`, `OidcServerOptions`, and the `MinApiLib.Oidc.Server.Features.*` and
-    `MinApiLib.Oidc.Server.Core.*` namespaces. The protocol behaviour is the same, and the integration test suite
-    runs against it in `tests/MinApiLib.Oidc.Server.IntegrationTests`.
+  - Assemblies are not strong-name signed.
+- **`MinApiLib.Oidc.Server`.** The server, in one package, built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib)
+  endpoint records and attribute-based dependency injection (see [Hosting](#hosting)).
+  - The protocol behaviour is that of the IdentityServer fork, whose integration test suite runs against it in
+    `tests/MinApiLib.Oidc.Server.IntegrationTests`.
   - `options.Authentication.EnforceAcrValues`, off by default, makes `acr_values` required: a session whose `acr`
     is not one of them goes back to the login page once (step-up), and then the client gets
     `unmet_authentication_requirements`, which is now returned to the client's redirect URI.
-- **New `MinApiLib.Oidc.Server.MongoDB` package.** MongoDB stores for clients, resources, CORS origins, persisted
+- **`MinApiLib.Oidc.Server.MongoDB`.** MongoDB stores for clients, resources, CORS origins, persisted
   grants, device codes and the signing keys of automatic key management, with TTL indexes that expire grants and
   device codes. Its tests run against MongoDB in Docker (Testcontainers).
-- **New client packages.** `HttpClient` handlers that send access tokens, for any OpenID Connect server, as bearer
+- **Client packages.** `HttpClient` handlers that send access tokens, for any OpenID Connect server, as bearer
   tokens or DPoP-bound, handling `DPoP-Nonce`:
   - `MinApiLib.Oidc.Http`, without ASP.NET Core: client credentials tokens (`AddClientCredentialsTokens`,
     `AddClientCredentialsTokenHandler`), cached and renewed, and the `AccessTokenHandler` and `TokenEndpointClient`
@@ -75,12 +71,12 @@ Read this before you move a host from IdentityServer4 4.1.2:
   - `MinApiLib.Oidc.Authentication`: the signed-in user's tokens (`AddOpenIdConnectTokens`,
     `AddUserAccessTokenHandler`). It refreshes them, updates the session and binds the authorization code to the
     DPoP key (`dpop_jkt`).
-- **New `MinApiLib.Oidc.DPoP` package.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
+- **`MinApiLib.Oidc.DPoP`.** DPoP keys, proofs, RFC 7638 thumbprints, nonces and the names of RFC 9449,
   shared by the client packages and `MinApiLib.Oidc.Server`, and `DPoPProofValidator` with a replay cache for
   servers that validate proofs. The server's `DefaultDPoPProofValidator` and `MinApiLib.Oidc.JwtBearer` both use it,
   so the token endpoint and the APIs check proofs the same way: `htu` matches with scheme and host case-insensitive
   and the path exact.
-- **New `MinApiLib.Oidc.JwtBearer` package.** DPoP for APIs on ASP.NET Core JWT bearer authentication:
+- **`MinApiLib.Oidc.JwtBearer`.** DPoP for APIs on ASP.NET Core JWT bearer authentication:
   `AddJwtBearer().AddDPoP()` accepts `Authorization: DPoP`, validates the proof against `cnf.jkt`, rejects DPoP-bound
   tokens sent as bearer tokens, can require DPoP-bound tokens only or API-issued nonces, and announces both schemes in
   its challenges. The API sample uses it.
@@ -91,17 +87,15 @@ Read this before you move a host from IdentityServer4 4.1.2:
 
 ### Hosting
 
-- **Endpoint routing only.** `MapIdentityServer()` maps every protocol endpoint, including those added with
-  `AddEndpoint<T>` and the `/connect/mtls/...` aliases.
-  - The middleware-based `IEndpointRouter` has been removed.
-  - `UseIdentityServer()` still adds the middleware: session cookie, CORS, authentication, mutual TLS and logout
+- **Endpoint routing.** Every protocol endpoint is a MinApiLib endpoint record for the HTTP methods it supports,
+  mapped by `MapOidcServer()` with its `/connect/mtls/...` alias. Other methods get a routing 405.
+  - `UseOidcServer()` adds the middleware: session cookie, CORS, authentication, mutual TLS and logout
     notifications.
-  - `AddIdentityServer()` registers the routing services.
-  - A host that forgets `MapIdentityServer()` fails with a clear `InvalidOperationException`.
-- **Per-endpoint policies.** `MapIdentityServer()` returns a conventions builder, with `ForEndpoint(name)` for one
+  - A host that forgets `MapOidcServer()` fails with a clear `InvalidOperationException`.
+- **Per-endpoint policies.** `MapOidcServer()` returns a conventions builder, with `ForEndpoint(name)` for one
   endpoint, so you can apply ASP.NET Core policies such as rate limiting or output caching.
-  `IdentityServerConstants.EndpointNames` is public.
-- **Endpoint results.** Every endpoint result is also an ASP.NET Core `IResult`.
+  `OidcServerConstants.EndpointNames` is public.
+- **Endpoint results.** Every endpoint result is an ASP.NET Core `IResult`.
 - **Back-channel logout.** Notifications are sent from a background service (`Channel<T>`), so slow clients no longer
   delay the user's sign-out. Set `Authentication.SendBackChannelLogoutNotificationsInBackground = false` to send them
   inline.
@@ -165,7 +159,7 @@ discovery.
 |---|---|
 | Implicit (`id_token`, `id_token token`, `token`) | `GrantTypes.Implicit` and `AllowImplicitFlow = true` |
 | Access tokens from the authorize endpoint (`token`, `id_token token`, `code token`, `code id_token token`) | `AllowAccessTokensViaBrowser = true` (as in IdentityServer4) |
-| Resource owner password credentials | `GrantTypes.ResourceOwnerPassword`, `AllowResourceOwnerPasswordFlow = true`, and an `IResourceOwnerPasswordValidator` (`AddResourceOwnerValidator<T>()`; `AddAspNetIdentity<TUser>()` registers one) |
+| Resource owner password credentials | `GrantTypes.ResourceOwnerPassword`, `AllowResourceOwnerPasswordFlow = true`, and an `IResourceOwnerPasswordValidator` (`AddResourceOwnerValidator<T>()`) |
 | PKCE `plain` | `AllowPlainTextPkce = true` (unchanged) |
 
 An implicit request with the `openid` scope must carry a `nonce`. Without an `IResourceOwnerPasswordValidator`, the
@@ -220,13 +214,15 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   - A client that sends a `DPoP` header receives `DPoP` tokens.
   - `IReplayCache` is always registered.
 - **Disabled endpoints.** A disabled endpoint answers 404.
+- **Unsupported methods.** A request with a method the endpoint does not support gets a routing 405 with an `Allow`
+  header, instead of a 405 or a 400 `invalid_request` from the endpoint.
 - **Null handling.** Places that could throw `NullReferenceException` now throw `InvalidOperationException` with a
   message, for example when a UI URL is not configured.
 - **Log events.** Log messages have new event ids. Interaction errors are logged as "Interaction error: …".
 
 ### Configuration
 
-- **Options validation.** `IdentityServerOptions` is validated at startup (`IValidateOptions` + `ValidateOnStart`).
+- **Options validation.** `OidcServerOptions` is validated at startup (`IValidateOptions` + `ValidateOnStart`).
   Each of these stops the host:
   - an issuer that is not an absolute URL;
   - non-positive lifetimes or limits;
@@ -235,16 +231,16 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
 - **Explicit `TimeProvider`.** `TimeProvider.System` is registered explicitly.
 - **Nonce endpoint.** `EnableNonceEndpoint = false` disables it.
 
-### Breaking API changes
+### API changes
 
-- **Namespaces.** `IdentityServer4.*` becomes `IdentityServer.*`, and `IdentityModel` becomes
-  `IdentityServer.IdentityModel`.
+Beyond the renames in the [server README](src/MinApiLib.Oidc.Server/README.md#differences-from-the-identityserver-fork):
+
 - **Removed.**
-  - `IEndpointRouter` and its implementation.
+  - `IEndpointRouter`, `IEndpointHandler` and `AddEndpoint<T>()`: endpoints are MinApiLib endpoint records.
   - `Client.PairWiseSubjectSalt` and `SubjectTypes`, because pairwise subjects were never implemented.
   - The obsolete `PrincipalExtensions.GetName`.
 - **Constructors.**
-  - Several constructors take `IIssuerNameService` instead of `IHttpContextAccessor`: `IdentityServerTools`,
+  - Several constructors take `IIssuerNameService` instead of `IHttpContextAccessor`: `OidcServerTools`,
     `JwtRequestValidator`, `PrivateKeyJwtSecretValidator`, `LogoutNotificationService` and `DefaultTokenService`.
   - `EndSessionRequestValidator` takes `IClientStore`.
 - **Interfaces.**
@@ -255,13 +251,11 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
 - **New contract members.** `IRefreshTokenService.CreateRefreshTokenAsync` takes the authorized resource indicators.
   `IAuthorizationCodeStore.ConsumeAuthorizationCodeAsync`, `IAuthorizeRequestValidator` and `ITokenRequestValidator`
   gained members with default implementations.
-- **Other.**
-  - `IdentityServerUser` moved to the `IdentityServer.Models` assembly, keeping the `IdentityServer` namespace.
-  - `IdentityServer.Models` no longer exposes the public `IsMissing`/`IsPresent` helpers.
-  - Six parameters were renamed to match their interface. This affects named arguments only.
 
 ### Internal changes
 
+- **Vertical slices.** The code is organized by feature (`Features/Tokens`, `Features/Authorize`, ...) with a shared
+  `Core`, and the default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute.
 - **Token request validation.** `TokenRequestValidator` is split into one validator per grant, with no per-request
   state in fields.
 - **Decorators.** Keyed services replace the reflection-based decorators.
@@ -282,7 +276,8 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
 - **Test stack.**
   - Tests run on xUnit v3 with Microsoft.Testing.Platform.
   - Assertions use xUnit's `Assert`; FluentAssertions was removed.
-  - The integration tests carry a small test-only protocol client ported from IdentityModel 7.0.0.
+  - The server's integration tests carry a small test-only protocol client ported from IdentityModel 7.0.0.
+  - The client packages and `MinApiLib.Oidc.JwtBearer` are tested against a real server, in memory.
 - **Hosting tests.** The integration suite runs through endpoint routing, and the hosts are disposed after each
   test.
 - **Snapshots.** Snapshot tests pin the discovery document and the shape of the access token.

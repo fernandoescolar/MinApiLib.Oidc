@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>OpenID Connect and OAuth 2.0 protocol constants and helpers used by IdentityServer: OidcConstants, JwtClaimTypes, CryptoRandom, claim and principal helpers. Derived from IdentityModel 7.0.0 (Apache-2.0), without the client library.</Description>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-</Project>

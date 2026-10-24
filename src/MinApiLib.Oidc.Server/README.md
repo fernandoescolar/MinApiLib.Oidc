@@ -5,8 +5,9 @@ An OpenID Connect and OAuth 2.0 server for ASP.NET Core built on [MinApiLib](htt
 - every protocol endpoint is a MinApiLib endpoint record, mapped with `MapEndpoints`;
 - the default services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute and `AddAssembly`.
 
-It is a new implementation derived from the IdentityServer fork in this repository, which in turn derives from
-IdentityServer4 4.1.2 (Apache-2.0). It is a single package with no dependency on any IdentityServer package. It
+It is a new implementation derived from the IdentityServer fork of IdentityServer4 4.1.2 (Apache-2.0), which this
+repository keeps, archived, on the `archived/identity-server` branch. It is a single package with no dependency on
+any IdentityServer package. It
 depends only on ASP.NET Core, `Microsoft.IdentityModel.*`, `MinApiLib.Endpoints`, `MinApiLib.DependencyInjection` and
 [MinApiLib.Oidc.DPoP](../MinApiLib.Oidc.DPoP/README.md), whose DPoP names and access token hash it shares with the clients.
 
@@ -163,9 +164,10 @@ Only what an attribute cannot express is registered by hand: options, cookie aut
 clients, the back-channel logout background service and framework services. See
 [Core.cs](Core/Configuration/Core.cs).
 
-## Differences from the IdentityServer project
+## Differences from the IdentityServer fork
 
-The protocol behaviour is the same, so the IdentityServer integration test suite runs against this package.
+The protocol behaviour is that of the fork on the `archived/identity-server` branch, whose integration test suite
+runs against this package.
 The one change is that a request with a method the endpoint does not support gets a routing 405. Before, the
 endpoint itself answered, with a 405 or, at the token, device authorization and nonce endpoints, a 400
 `invalid_request`. The API is renamed:
@@ -192,8 +194,8 @@ ask for a stronger sign-in (step-up). If the session still does not meet them on
 the login page, and a user who already has a session gets tokens whatever the values ask for. Turn it on when the
 login page sets the `acr` claim of the sessions it creates.
 
-The repository's `IdentityServer.AspNetIdentity` integration and the unit test suite are not ported. The test
-users from `IdentityServer.Test` live in the integration test project
+The fork's `IdentityServer.AspNetIdentity` integration and its unit test suite are not ported. The test users
+from `IdentityServer.Test` live in the integration test project
 (`tests/MinApiLib.Oidc.Server.IntegrationTests/TestUsers`).
 
 ## License

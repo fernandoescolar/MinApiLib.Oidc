@@ -16,11 +16,6 @@
     <File Path="deploy/pipelines/main.yml" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/IdentityServer.AspNetIdentity/IdentityServer.AspNetIdentity.csproj" />
-    <Project Path="src/IdentityServer.IdentityModel/IdentityServer.IdentityModel.csproj" />
-    <Project Path="src/IdentityServer.Models/IdentityServer.Models.csproj" />
-    <Project Path="src/IdentityServer.Storage/IdentityServer.Storage.csproj" />
-    <Project Path="src/IdentityServer/IdentityServer.csproj" />
     <Project Path="src/MinApiLib.Oidc.Authentication/MinApiLib.Oidc.Authentication.csproj" />
     <Project Path="src/MinApiLib.Oidc.DPoP/MinApiLib.Oidc.DPoP.csproj" />
     <Project Path="src/MinApiLib.Oidc.Http/MinApiLib.Oidc.Http.csproj" />
@@ -38,9 +33,6 @@
     <Project Path="samples/Worker/Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/IdentityServer.IntegrationTests/IdentityServer.IntegrationTests.csproj" />
-    <Project Path="tests/IdentityServer.Test/IdentityServer.Test.csproj" />
-    <Project Path="tests/IdentityServer.UnitTests/IdentityServer.UnitTests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.Authentication.Tests/MinApiLib.Oidc.Authentication.Tests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.DPoP.Tests/MinApiLib.Oidc.DPoP.Tests.csproj" />
     <Project Path="tests/MinApiLib.Oidc.Http.Tests/MinApiLib.Oidc.Http.Tests.csproj" />

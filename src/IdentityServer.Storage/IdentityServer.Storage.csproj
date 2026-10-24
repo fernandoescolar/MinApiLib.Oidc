@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <Description>Storage abstractions and in-memory stores for IdentityServer (fork of IdentityServer4).</Description>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\IdentityServer.Models\IdentityServer.Models.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,15 +1,14 @@
 {
   "stryker-config": {
-    "solution": "IdentityServer.slnx",
-    "project": "IdentityServer.csproj",
+    "solution": "MinApiLib.Oidc.slnx",
+    "project": "MinApiLib.Oidc.Server.csproj",
     "test-runner": "mtp",
     "target-framework": "net10.0",
     "configuration": "Debug",
     "mutate": [
-      "**/Validation/**/*.cs",
-      "**/Endpoints/**/*.cs",
-      "**/ResponseHandling/**/*.cs",
-      "**/Services/Default/*.cs",
+      "**/Features/**/*.cs",
+      "**/Core/**/*.cs",
+      "!**/Core/IdentityModel/**/*.cs",
       "!**/Logging/**/*.cs",
       "!**/*Log.cs",
       "!**/LoggerExtensions.cs"

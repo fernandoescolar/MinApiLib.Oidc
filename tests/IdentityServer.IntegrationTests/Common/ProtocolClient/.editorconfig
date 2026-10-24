@@ -1,5 +1,0 @@
-root = false
-
-# Test-only protocol client ported from IdentityModel 7.0.0 (Apache-2.0). Analyzers are not applied to it.
-[*.cs]
-generated_code = true

@@ -1,1 +1,0 @@
-﻿namespace IdentityServer.UnitTests.Common;
