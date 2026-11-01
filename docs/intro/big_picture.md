@@ -4,7 +4,7 @@
 
 Most modern applications look more or less like this:
 
-![image](intro/images/appArch.png)
+![image](images/appArch.png)
 
 The most common interactions are:
 
@@ -15,59 +15,57 @@ The most common interactions are:
 * Server-based applications communicate with web APIs
 * Web APIs communicate with web APIs (sometimes on their own, sometimes on behalf of a user)
 
-Typically each and every layer (front-end, middle-tier and back-end) has to protect resources and
-implement authentication and/or authorization – often against the same user store.
+Each layer (front end, middle tier and back end) has to protect resources and implement authentication and
+authorization, often against the same user store.
 
-Outsourcing these fundamental security functions to a security token service prevents duplicating that functionality across those applications and endpoints.
+Moving these functions to a security token service avoids repeating them in every application and API. The
+architecture then looks like this:
 
-Restructuring the application to support a security token service leads to the following architecture and protocols:
+![image](images/protocols.png)
 
-![image](intro/images/protocols.png)
-
-Such a design divides security concerns into two parts:
+This design divides security into two concerns.
 
 ## Authentication
 
-Authentication is needed when an application needs to know the identity of the current user.
-Typically these applications manage data on behalf of that user and need to make sure that this user can only
-access the data for which he is allowed. The most common example for that is (classic) web applications –
-but native and JS-based applications also have a need for authentication.
+An application needs authentication when it needs to know who the current user is. It usually manages data on behalf
+of that user and must make sure the user only reaches the data they are allowed to. Classic web applications are the
+most common example, but native and browser-based applications need it too.
 
-The most common authentication protocols are SAML2p, WS-Federation and OpenID Connect – SAML2p being the
-most popular and the most widely deployed.
-
-OpenID Connect is the newest of the three, but is considered to be the future because it has the
-most potential for modern applications. It was built for mobile application scenarios right from the start
-and is designed to be API friendly.
+The common authentication protocols are SAML2p, WS-Federation and OpenID Connect. OpenID Connect is the newest. It
+was designed for mobile and API scenarios from the start, and it is the one MinApiLib.Oidc implements.
 
 ## API Access
 
-Applications have two fundamental ways with which they communicate with APIs – using the application identity,
-or delegating the user’s identity. Sometimes both methods need to be combined.
+Applications call APIs in two ways: with their own identity, or on behalf of a user. Sometimes they combine both.
 
-OAuth2 is a protocol that allows applications to request access tokens from a security token service and use them
-to communicate with APIs. This delegation reduces complexity in both the client applications as well as the APIs since
-authentication and authorization can be centralized.
+OAuth 2.0 lets applications request access tokens from a security token service and use them to call APIs.
+Authentication and authorization are centralized, which keeps both the clients and the APIs simpler.
 
-## OpenID Connect and OAuth 2.0 – better together
+## OpenID Connect and OAuth 2.0 together
 
-OpenID Connect and OAuth 2.0 are very similar – in fact OpenID Connect is an extension on top of OAuth 2.0.
-The two fundamental security concerns, authentication and API access, are combined into a  single protocol - often with a single round trip to the security token service.
+OpenID Connect is an extension of OAuth 2.0. Together they cover both concerns, authentication and API access, in a
+single protocol, often with a single round trip to the security token service.
 
-We believe that the combination of OpenID Connect and OAuth 2.0 is the best approach to secure modern
-applications for the foreseeable future. IdentityServer4 is an implementation of these two protocols and is
-highly optimized to solve the typical security problems of today’s mobile, native and web applications.
+Access tokens are bearer tokens by default: whoever holds one can use it. Proof of possession binds a token to a key
+the client holds, so a stolen token is useless on its own. MinApiLib.Oidc supports it with DPoP (RFC 9449) from the
+server to the clients and the APIs, and with mutual TLS on the server. See
+[Proof-of-Possession Access Tokens](../topics/pop.md).
 
-## How IdentityServer4 can help
+## How MinApiLib.Oidc can help
 
-IdentityServer is middleware that adds the spec compliant OpenID Connect and OAuth 2.0 endpoints to an arbitrary ASP.NET Core application.
+`MinApiLib.Oidc.Server` adds the OpenID Connect and OAuth 2.0 endpoints to an ASP.NET Core application.
 
-Typically, you build (or re-use) an application that contains a login and logout page (and maybe consent - depending on your needs),
-and the IdentityServer middleware adds the necessary protocol heads to it, so that client applications can talk to it using those standard protocols.
+You build (or reuse) an application with a login page and a logout page, and a consent page if your clients need it.
+The server adds the protocol endpoints, so client applications can talk to it with the standard protocols. There is
+no ready-made UI: the [samples](../../samples/README.md) show minimal login, logout and error pages.
 
-![image](intro/images/middleware.png)
+![image](images/middleware.png)
 
-The hosting application can be as complex as you want, but we typically recommend to keep the attack surface as small as possible by including
-authentication related UI only.
+The host can be as complex as you want, but keep the attack surface small: include the authentication UI only.
+
+The other packages cover the other side of the picture. `MinApiLib.Oidc.Http` and `MinApiLib.Oidc.Authentication`
+get, cache, refresh and send access tokens from client applications, and `MinApiLib.Oidc.JwtBearer` adds DPoP to
+ASP.NET Core JWT bearer authentication in APIs. They work with any OpenID Connect server. See
+[Packages and Builds](packaging.md).
 
 [[go back to index]](../index.md#documentation-structure)

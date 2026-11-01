@@ -1,400 +1,381 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refclientcredentialsquickstart"></a>
+
 # Protecting an API using Client Credentials
 
-The following Identity Server 4 quickstart provides step by step instructions for various common IdentityServer scenarios.
-These start with the absolute basics and become more complex as they progress. We recommend that you follow them in sequence.
+This first quickstart is the most basic scenario: a server, an API, and a client without a user that calls the API.
+The client requests an access token from the server with its client id and secret (the client credentials grant),
+and sends it to the API. The API checks that the token comes from the server and was issued for it.
 
-To see the full list, please go to [IdentityServer4 Quickstarts Overview](https://identityserver4.readthedocs.io/en/latest/quickstarts/0_overview.html)
+You build three projects:
 
-This first quickstart is the most basic scenario for protecting APIs using IdentityServer.
-In this quickstart you define an API and a Client with which to access it.
-The client will request an access token from the Identity Server using its client ID and secret and then use the token to gain access to the API.
+* **Server**, with `MinApiLib.Oidc.Server` and its configuration in memory;
+* **Api**, an orders API protected with ASP.NET Core's `AddJwtBearer`;
+* **Worker**, a console application that gets its token with `MinApiLib.Oidc.Http`.
 
-## Source Code
+At the end, the same three projects use DPoP-bound tokens instead of bearer tokens.
 
-As with all of these quickstarts you can find the source code for it in the [IdentityServer4](https://github.com/IdentityServer/IdentityServer4/blob/main/samples) repository. The project for this quickstart is [Quickstart #1: Securing an API using Client Credentials](https://github.com/IdentityServer/IdentityServer4/tree/main/samples/Quickstarts/1_ClientCredentials)
+Do the [preparation](0_overview.md#preparation) first. The finished code is in
+[samples/](../../samples/README.md): `Server`, `Api` and `Worker`.
 
-## Preparation
+## Creating the server
 
-The IdentityServer templates for the dotnet CLI are a good starting point for the quickstarts.
-To install the templates open a console window and type the following command:
+From the solution folder:
 
-```csharp
-dotnet new -i IdentityServer4.Templates
+```bash
+dotnet new web -n Server
+dotnet sln add Server
+dotnet add Server package MinApiLib.Oidc.Server --prerelease
 ```
 
-They will be used as a starting point for the various tutorials.
+Set the server's address to `https://localhost:5001` in `Server/Properties/launchSettings.json`, as the
+[overview](0_overview.md#preparation) shows.
 
-## Setting up the ASP.NET Core application
+## Defining an API
 
-First create a directory for the application - then use our template to create an ASP.NET Core application that includes a basic IdentityServer setup, e.g.:
+An API is a resource you want to protect. The server describes it with two kinds of objects:
 
-```csharp
-md quickstart
-cd quickstart
+* an **API scope** is what a client can ask for, here `orders.read`;
+* an **API resource** is the API itself. Its name becomes the audience (`aud`) of the access token, which the API
+  checks, and it lists the scopes that belong to it.
 
-md src
-cd src
-
-dotnet new is4empty -n IdentityServer
-```
-
-This will create the following files:
-
-* `IdentityServer.csproj` - the project file and a `Properties\launchSettings.json` file
-* `Program.cs` and `Startup.cs` - the main application entry point
-* `Config.cs` - IdentityServer resources and clients configuration file
-
-You can now use your favorite text editor to edit or view the files. If you want to have Visual Studio support, you can add a solution file like this:
+The quickstarts define them in code. Add a `Config.cs` file to the server:
 
 ```csharp
-cd ..
-dotnet new sln -n Quickstart
-```
+using MinApiLib.Oidc.Server.Core.ClientAuthentication;
+using MinApiLib.Oidc.Server.Core.Models;
 
-and let it add your IdentityServer project (keep this command in mind as we will create other projects below):
-
-```csharp
-dotnet sln add .\src\IdentityServer\IdentityServer.csproj
-```
-
-#### NOTE
-The protocol used in this Template is `https` and the port is set to 5001 when running on Kestrel or a random one on IISExpress. You can change that in the `Properties\launchSettings.json` file. For production scenarios you should always use `https`.
-
-## Defining an API Scope
-
-An API is a resource in your system that you want to protect.
-Resource definitions can be loaded in many ways, the template you used to create the project above shows how to use a “code as configuration” approach.
-
-The Config.cs is already created for you. Open it, update the code to look like this:
-
-```csharp
 public static class Config
 {
     public static IEnumerable<ApiScope> ApiScopes =>
-        new List<ApiScope>
-        {
-            new ApiScope("api1", "My API")
-        };
+    [
+        new ApiScope("orders.read", "Read your orders")
+    ];
+
+    public static IEnumerable<ApiResource> ApiResources =>
+    [
+        new ApiResource("orders", "Orders API") { Scopes = { "orders.read" } }
+    ];
 }
 ```
 
-(see the full file [here](https://github.com/IdentityServer/IdentityServer4/blob/main/samples/Quickstarts/1_ClientCredentials/src/IdentityServer/Config.cs)).
-
-#### NOTE
-If you will be using this in production it is important to give your API a logical name. Developers will be using this to connect to your api though your Identity server.  It should describe your api in simple terms to both developers and users.
+Give your APIs and scopes names that describe them to the developers who use them, and to the users who see them on
+a consent page. See [Defining Resources](../topics/resources.md).
 
 ## Defining the client
 
-The next step is to define a client application that we will use to access our new API.
-
-For this scenario, the client will not have an interactive user, and will authenticate using the so called client secret with IdentityServer.
-
-For this, add a client definition:
+Next, define the client that calls the API. It has no user, and it authenticates with a secret. Add this to
+`Config`:
 
 ```csharp
 public static IEnumerable<Client> Clients =>
-    new List<Client>
+[
+    new Client
     {
-        new Client
-        {
-            ClientId = "client",
+        ClientId = "worker",
 
-            // no interactive user, use the clientid/secret for authentication
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
+        // no user: the client authenticates with its own id and secret
+        AllowedGrantTypes = GrantTypes.ClientCredentials,
+        ClientSecrets = { new Secret("worker-secret".Sha256()) },
 
-            // secret for authentication
-            ClientSecrets =
-            {
-                new Secret("secret".Sha256())
-            },
-
-            // scopes that client has access to
-            AllowedScopes = { "api1" }
-        }
-    };
+        // the scopes the client can ask for
+        AllowedScopes = { "orders.read" }
+    }
+];
 ```
 
-You can think of the ClientId and the ClientSecret as the login and password for your application itself.
-It identifies your application to the identity server so that it knows which application is trying to connect to it.
+Think of the client id and secret as the login and password of the application itself. The server stores the hash of
+the secret only (`Sha256()`, from `MinApiLib.Oidc.Server.Core.ClientAuthentication`).
 
-## Configuring IdentityServer
+## Configuring the server
 
-Loading the resource and client definitions happens in [Startup.cs](https://github.com/IdentityServer/IdentityServer4/blob/main/samples/Quickstarts/1_ClientCredentials/src/IdentityServer/Startup.cs) - update the code to look like this:
+Replace `Server/Program.cs`:
 
 ```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    var builder = services.AddIdentityServer()
-        .AddDeveloperSigningCredential()        //This is for dev only scenarios when you don’t have a certificate to use.
-        .AddInMemoryApiScopes(Config.ApiScopes)
-        .AddInMemoryClients(Config.Clients);
+var builder = WebApplication.CreateBuilder(args);
 
-    // omitted for brevity
+builder.Services.AddOidcServer()
+    .AddInMemoryApiScopes(Config.ApiScopes)
+    .AddInMemoryApiResources(Config.ApiResources)
+    .AddInMemoryClients(Config.Clients)
+    .AddDeveloperSigningCredential();   // development only: a key in tempkey.jwk
+
+var app = builder.Build();
+
+app.UseRouting();
+app.UseOidcServer();   // session cookie, CORS, authentication, mutual TLS, logout notifications
+app.MapOidcServer();   // the protocol endpoints
+
+app.Run();
+```
+
+`AddOidcServer()` registers the server and returns an `IOidcServerBuilder`, on which you add the configuration and
+the signing key. `UseOidcServer()` adds its middleware and `MapOidcServer()` maps the protocol endpoints; both are
+required.
+
+`AddDeveloperSigningCredential()` creates an RSA key at the first start and keeps it in `tempkey.jwk`, in the
+current directory. Don't commit that file: the server creates it again when it is missing. In production, use a real
+key with `AddSigningCredential(...)`, or let the server create and rotate its keys with
+`options.KeyManagement.Enabled = true`, as the sample server does. See
+[Cryptography, Keys and HTTPS](../topics/crypto.md).
+
+Run the server:
+
+```bash
+dotnet run --project Server
+```
+
+Open `https://localhost:5001/.well-known/openid-configuration`. This is the discovery document: clients and APIs read
+the server's endpoints and keys from it, so they only need to know the server's address.
+
+```json
+{
+  "issuer": "https://localhost:5001",
+  "jwks_uri": "https://localhost:5001/.well-known/openid-configuration/jwks",
+  "authorization_endpoint": "https://localhost:5001/connect/authorize",
+  "token_endpoint": "https://localhost:5001/connect/token",
+  ...
 }
 ```
 
-That’s it - your identity server should now be configured. If you run the server and navigate the browser to `https://localhost:5001/.well-known/openid-configuration`, you should see the so-called discovery document.
-The discovery document is a standard endpoint in identity servers.  The discovery document will be used by your clients and APIs to download the necessary configuration data.
+The server can already issue tokens. A token request with the client's credentials:
 
-![image](quickstarts/images/1_discovery.png)
+```http
+POST /connect/token HTTP/1.1
+Host: localhost:5001
+Content-Type: application/x-www-form-urlencoded
 
-At first startup, IdentityServer will create a developer signing key for you, it’s a file called `tempkey.jwk`.
-You don’t have to check that file into your source control, it will be re-created if it is not present.
+grant_type=client_credentials&client_id=worker&client_secret=worker-secret&scope=orders.read
+```
+
+```json
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsImtpZCI6IkMyMzQ5NDI3...",
+  "expires_in": 3600,
+  "token_type": "Bearer",
+  "scope": "orders.read"
+}
+```
+
+The access token is a JWT of type `at+jwt`. Decoded, its payload has the issuer, the audience (the API resource),
+the client, the scopes and the lifetime:
+
+```json
+{
+  "iss": "https://localhost:5001",
+  "aud": "orders",
+  "client_id": "worker",
+  "scope": [ "orders.read" ],
+  "jti": "72D62815487F13A56E26D349F0050C68",
+  "iat": 1794912817,
+  "nbf": 1794912817,
+  "exp": 1794916417
+}
+```
 
 ## Adding an API
 
-Next, add an API to your solution.
+Create the API, with `MinApiLib.Oidc.JwtBearer`. You only need it for DPoP, at the end of this quickstart, but it
+also brings Microsoft's `Microsoft.AspNetCore.Authentication.JwtBearer` in the version that matches your framework:
 
-You can either use the ASP.NET Core Web API template from Visual Studio or use the .NET CLI to create the API project as we do here.
-Run from within the `src` folder the following command:
-
-```csharp
-dotnet new webapi -n Api
+```bash
+dotnet new web -n Api
+dotnet sln add Api
+dotnet add Api package MinApiLib.Oidc.JwtBearer --prerelease
 ```
 
-Then add it to the solution by running the following commands:
+Set its address to `https://localhost:5003` in `Api/Properties/launchSettings.json`, and replace `Api/Program.cs`:
 
 ```csharp
-cd ..
-dotnet sln add .\src\Api\Api.csproj
-```
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
-Configure the API application to run on `https://localhost:6001` only. You can do this by editing the [launchSettings.json](https://github.com/IdentityServer/IdentityServer4/blob/main/samples/Quickstarts/1_ClientCredentials/src/Api/Properties/launchSettings.json) file inside the Properties folder. Change the application URL setting to be:
+var builder = WebApplication.CreateBuilder(args);
 
-```csharp
-"applicationUrl": "https://localhost:6001"
-```
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // the server: the handler reads its discovery document and signing keys
+        options.Authority = "https://localhost:5001";
 
-### The controller
+        // the API resource: tokens for other APIs are rejected
+        options.Audience = "orders";
 
-Add a new class called `IdentityController`:
+        // keep the claim names of the token ("sub", "scope", "client_id")
+        options.MapInboundClaims = false;
 
-```csharp
-[Route("identity")]
-[Authorize]
-public class IdentityController : ControllerBase
+        // access tokens only, not identity tokens or other JWTs of the server
+        options.TokenValidationParameters.ValidTypes = ["at+jwt"];
+    });
+
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("orders.read", policy => policy.RequireAuthenticatedUser().RequireClaim("scope", "orders.read"));
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/orders", (ClaimsPrincipal user) => new
 {
-    [HttpGet]
-    public IActionResult Get()
+    client = user.FindFirst("client_id")?.Value,
+    user = user.FindFirst("sub")?.Value,
+    orders = new[]
     {
-        return new JsonResult(from c in User.Claims select new { c.Type, c.Value });
+        new { id = 1001, total = 42.50m, status = "shipped" },
+        new { id = 1002, total = 18.00m, status = "processing" }
     }
-}
+}).RequireAuthorization("orders.read");
+
+app.Run();
 ```
 
-This controller will be used later to test the authorization requirement, as well as visualize the claims identity through the eyes of the API.
+`AddJwtBearer` validates each token: its signature with the server's keys, the issuer, the audience, the type and the
+lifetime. The `orders.read` policy then requires the scope. A token for the same API without that scope gets `403`.
 
-### Adding a Nuget Dependency
-
-In order for the configuration step to work the nuget package dependency has to be added, run this command in the root directory:
-
-```csharp
-dotnet add .\\src\\api\\Api.csproj package Microsoft.AspNetCore.Authentication.JwtBearer
-```
-
-### Configuration
-
-The last step is to add the authentication services to DI (dependency injection) and the authentication middleware to the pipeline.
-These will:
-
-* validate the incoming token to make sure it is coming from a trusted issuer
-* validate that the token is valid to be used with this api (aka audience)
-
-Update Startup to look like this:
-
-```csharp
-public class Startup
-{
-    public void ConfigureServices(IServiceCollection services)
-    {
-        services.AddControllers();
-
-        services.AddAuthentication("Bearer")
-            .AddJwtBearer("Bearer", options =>
-            {
-                options.Authority = "https://localhost:5001";
-
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateAudience = false
-                };
-            });
-    }
-
-    public void Configure(IApplicationBuilder app)
-    {
-        app.UseRouting();
-
-        app.UseAuthentication();
-        app.UseAuthorization();
-
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapControllers();
-        });
-    }
-}
-```
-
-* `AddAuthentication` adds the authentication services to DI and configures `Bearer` as the default scheme.
-* `UseAuthentication` adds the authentication middleware to the pipeline so authentication will be performed automatically on every call into the host.
-* `UseAuthorization` adds the authorization middleware to make sure, our API endpoint cannot be accessed by anonymous clients.
-
-Navigating to the controller `https://localhost:6001/identity` on a browser should return a 401 status code.
-This means your API requires a credential and is now protected by IdentityServer.
-
-#### NOTE
-If you are wondering, why the above code disables audience validation, have a look [here](../topics/resources.md#refresources) for a more in-depth discussion.
+Run the API next to the server and open `https://localhost:5003/orders`. Without a token, the API answers `401`.
 
 ## Creating the client
 
-The last step is to write a client that requests an access token, and then uses this token to access the API. For that, add a console project to your solution, remember to create it in the `src`:
+The last project is the worker. Create a console application with `MinApiLib.Oidc.Http` and the .NET generic host:
 
-```csharp
-dotnet new console -n Client
+```bash
+dotnet new console -n Worker
+dotnet sln add Worker
+dotnet add Worker package MinApiLib.Oidc.Http --prerelease
+dotnet add Worker package Microsoft.Extensions.Hosting
 ```
 
-Then as before, add it to your solution using:
+You could request the token with a plain HTTP request, as above. `MinApiLib.Oidc.Http` does it for you: it finds the
+token endpoint in the discovery document, requests a token on the first call, keeps it until a minute before it
+expires, and adds it to every request of an `HttpClient`.
+
+Replace `Worker/Program.cs`:
 
 ```csharp
-cd ..
-dotnet sln add .\src\Client\Client.csproj
-```
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-The token endpoint at IdentityServer implements the OAuth 2.0 protocol, and you could use raw HTTP to access it.
-However, we have a client library called IdentityModel, that encapsulates the protocol interaction in an easy to use API.
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
-Add the `IdentityModel` NuGet package to your client.
-This can be done either via Visual Studio’s Nuget Package manager or dotnet CLI:
-
-```csharp
-cd src
-cd client
-dotnet add package IdentityModel
-```
-
-IdentityModel includes a client library to use with the discovery endpoint. This way you only need to know the base-address of IdentityServer - the actual endpoint addresses can be read from the metadata:
-
-```csharp
-// discover endpoints from metadata
-var client = new HttpClient();
-var disco = await client.GetDiscoveryDocumentAsync("https://localhost:5001");
-if (disco.IsError)
+// the client: how to get its token
+builder.Services.AddClientCredentialsTokens("orders", options =>
 {
-    Console.WriteLine(disco.Error);
-    return;
-}
-```
-
-#### NOTE
-If you get an error connecting it may be that you are running https and the development certificate for `localhost` is not trusted. You can run `dotnet dev-certs https --trust` in order to trust the development certificate. This only needs to be done once.
-
-Next you can use the information from the discovery document to request a token to IdentityServer to access `api1`:
-
-```csharp
-// request token
-var tokenResponse = await client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
-{
-    Address = disco.TokenEndpoint,
-
-    ClientId = "client",
-    ClientSecret = "secret",
-    Scope = "api1"
+    options.Authority = "https://localhost:5001";
+    options.ClientId = "worker";
+    options.ClientSecret = "worker-secret";
+    options.Scope = "orders.read";
 });
 
-if (tokenResponse.IsError)
-{
-    Console.WriteLine(tokenResponse.Error);
-    return;
-}
+// the API: each request carries the client's token
+builder.Services.AddHttpClient("orders", client => client.BaseAddress = new Uri("https://localhost:5003"))
+    .AddClientCredentialsTokenHandler("orders");
 
-Console.WriteLine(tokenResponse.Json);
+using var host = builder.Build();
+
+var orders = host.Services.GetRequiredService<IHttpClientFactory>().CreateClient("orders");
+using var response = await orders.GetAsync("/orders");
+
+Console.WriteLine($"{(int)response.StatusCode} {response.StatusCode}");
+Console.WriteLine(await response.Content.ReadAsStringAsync());
 ```
 
-(full file can be found [here](https://github.com/IdentityServer/IdentityServer4/blob/main/samples/Quickstarts/1_ClientCredentials/src/Client/Program.cs))
-
-#### NOTE
-Copy and paste the access token from the console to [jwt.ms](https://jwt.ms) to inspect the raw token.
+`AddClientCredentialsTokens` registers a client under a name, and `AddClientCredentialsTokenHandler` sends that
+client's token with every request of the HTTP client. The worker never sees the token. To get it yourself, use
+`IClientCredentialsTokenManager` (namespace `MinApiLib.Oidc.Http.ClientCredentials`):
+`await tokens.GetAccessTokenAsync("orders")`.
 
 ## Calling the API
 
-To send the access token to the API you typically use the HTTP Authorization header. This is done using the `SetBearerToken` extension method:
+With the server and the API running, run the worker:
 
-```csharp
-// call api
-var apiClient = new HttpClient();
-apiClient.SetBearerToken(tokenResponse.AccessToken);
-
-var response = await apiClient.GetAsync("https://localhost:6001/identity");
-if (!response.IsSuccessStatusCode)
-{
-    Console.WriteLine(response.StatusCode);
-}
-else
-{
-    var content = await response.Content.ReadAsStringAsync();
-    Console.WriteLine(JArray.Parse(content));
-}
+```bash
+dotnet run --project Worker
 ```
 
-(If you are in Visual Studio you can right-click on the solution and select “Multiple Startup Projects”, and ensure the Api and IdentityServer will start; then run the solution; then, to step through the Client code, you can right-click on the “Client” project and select Debug… Start New Instance).
-The output should look like this:
+The request it sends, and the answer:
 
-![image](quickstarts/images/1_client_screenshot.png)
+```http
+GET /orders HTTP/1.1
+Host: localhost:5003
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6...
+```
 
-#### NOTE
-By default an access token will contain claims about the scope, lifetime (nbf and exp), the client ID (client_id) and the issuer name (iss).
+```text
+200 OK
+{"client":"worker","user":null,"orders":[{"id":1001,"total":42.50,"status":"shipped"},{"id":1002,"total":18.00,"status":"processing"}]}
+```
 
-## Authorization at the API
+There is no `sub`: the token belongs to the client, not to a user.
 
-Right now, the API accepts any access token issued by your identity server.
+## Binding the token to a key with DPoP
 
-In the following we will add code that allows checking for the presence of the scope in the access token that the client asked for (and got granted).
-For this we will use the ASP.NET Core authorization policy system. Add the following to the `ConfigureServices` method in `Startup`:
+A bearer token works for whoever holds it. A DPoP-bound token ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449))
+only works with a proof signed by a key that only the client holds. Three changes turn it on.
+
+In the worker, create a key and bind the token to it:
 
 ```csharp
-services.AddAuthorization(options =>
+builder.Services.AddClientCredentialsTokens("orders", options =>
 {
-    options.AddPolicy("ApiScope", policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireClaim("scope", "api1");
-    });
+    // ...
+    options.UseDPoP = true;
 });
 ```
 
-You can now enforce this policy at various levels, e.g.
+The worker creates an EC P-256 key in memory and sends a proof of it with the token request. The server binds the
+token to the key: it answers `"token_type": "DPoP"` and the token carries the key's thumbprint in `cnf.jkt`. Each
+API call then carries the token with the `DPoP` scheme and a new proof for that method and URL:
 
-* globally
-* for all API endpoints
-* for specific controllers/actions
+```http
+GET /orders HTTP/1.1
+Host: localhost:5003
+Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6...
+DPoP: eyJhbGciOiJFUzI1NiIsImp3ayI6eyJrdHkiOiJFQyIs...
+```
 
-Typically you setup the policy for all API endpoints in the routing system:
+In the API, add one line after `AddJwtBearer` (`MinApiLib.Oidc.JwtBearer`):
 
 ```csharp
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapControllers()
-        .RequireAuthorization("ApiScope");
-});
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => { /* as before */ })
+    .AddDPoP();
 ```
+
+`AddDPoP()` accepts `Authorization: DPoP`, checks the proof (signature, method, URL, age, token hash, replay) and that
+its key is the one in `cnf.jkt`, and rejects a DPoP-bound token sent as a bearer token. Bearer tokens still work;
+`options.Mode = DPoPTokenMode.Required` accepts DPoP-bound tokens only. In an endpoint,
+`HttpContext.GetAccessTokenScheme()` and `HttpContext.GetDPoPThumbprint()` (namespace `MinApiLib.Oidc.JwtBearer`)
+tell how the request was authenticated.
+
+On the server, nothing is needed: a token request with a proof gets a DPoP-bound token. To refuse token requests
+without a proof, set `RequireDPoP` on the client:
+
+```csharp
+new Client
+{
+    ClientId = "worker",
+    // ...
+    RequireDPoP = true
+}
+```
+
+[Proof-of-Possession Access Tokens](../topics/pop.md) walks through the exchange message by message. The sample worker
+runs both variants, with the clients `worker` and `worker.dpop`, and prints each proof.
 
 ## Further experiments
 
-This walkthrough focused on the success path so far
+So far the walkthrough followed the success path. Try to provoke errors to learn how the system behaves:
 
-* client was able to request token
-* client could use the token to access the API
-
-You can now try to provoke errors to learn how the system behaves, e.g.
-
-* try to connect to IdentityServer when it is not running (unavailable)
-* try to use an invalid client id or secret to request the token
-* try to ask for an invalid scope during the token request
-* try to call the API when it is not running (unavailable)
-* don’t send the token to the API
-* configure the API to require a different scope than the one in the token
+* stop the server and run the worker: the token request fails;
+* use a wrong client id or secret: the server answers `invalid_client`, and the worker throws an
+  `AccessTokenException` with the error;
+* ask for a scope the client is not allowed: `invalid_scope`;
+* call the API without a token, or with a token whose `aud` is not `orders`: `401`;
+* require a scope in the API that is not in the token: `403`;
+* with DPoP, send the token as `Authorization: Bearer`: the API answers `401` with `invalid_token`.
 
 [[go back to index]](../index.md#documentation-structure)

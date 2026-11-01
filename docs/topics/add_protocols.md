@@ -2,95 +2,119 @@
 
 # Adding new Protocols
 
-IdentityServer4 allows adding support for other protocols besides the built-in
-support for OpenID Connect and OAuth 2.0.
+The server lets the host add other protocols besides the built-in support for OpenID Connect and OAuth 2.0, e.g.
+WS-Federation or SAML.
 
-You can add those additional protocol endpoints either as middleware or using e.g. MVC controllers.
-In both cases you have access to the ASP.NET Core DI system which allows re-using our
-internal services like access to client definitions or key material.
+You add those protocol endpoints as MinApiLib endpoint records in the host's assembly, mapped with
+`app.MapEndpoints()` (or as any other ASP.NET Core endpoint or middleware). They have access to the dependency
+injection container, so they can reuse the server's services, like the client definitions or the key material. A
+record that calls `AsOidcServerEndpoint` from its `Configure` gets the same events for unhandled exceptions and
+logging as the protocol endpoints (see "Custom endpoints" in the [server README](../../src/MinApiLib.Oidc.Server/README.md)):
 
-A sample for adding WS-Federation support can be found [here](https://github.com/IdentityServer/IdentityServer4.WsFederation).
+```csharp
+public sealed record WsFederationEndpoint() : GetHandlerAsync<WsFederationEndpoint.Request>("/wsfed")
+{
+    public readonly record struct Request(
+        HttpContext HttpContext,
+        [FromServices] IClientStore Clients,
+        [FromServices] IKeyMaterialService Keys,
+        [FromServices] IOidcServerInteractionService Interaction);
+
+    protected override RouteHandlerBuilder Configure(RouteHandlerBuilder builder)
+        => builder.AsOidcServerEndpoint("WsFederation", Path, GetType());
+
+    protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
+    {
+        // validate the request, send the user to the login page, create the response
+        return Results.Empty;
+    }
+}
+```
 
 ## Typical authentication workflow
 
 An authentication request typically works like this:
 
-* authentication request arrives at protocol endpoint
-* protocol endpoint does input validation
-* redirection to login page with a return URL set back to protocol endpoint (if user is anonymous)
-  : * access to current request details via the `IIdentityServerInteractionService`
-    * authentication of user (either locally or via external authentication middleware)
-    * signing in the user
-    * redirect back to protocol endpoint
-* creation of protocol response (token creation and redirect back to client)
+* the authentication request arrives at the protocol endpoint
+* the protocol endpoint validates its input
+* if the user is anonymous, it redirects to the login page with a return URL back to the protocol endpoint
+  * the login page reads the current request details through the `IOidcServerInteractionService`
+  * it authenticates the user (either locally or via external authentication handlers)
+  * it signs the user in
+  * it redirects back to the protocol endpoint
+* the protocol endpoint creates the protocol response (token creation and redirect back to the client)
 
-## Useful IdentityServer services
+## Useful server services
 
-To achieve the above workflow, some interaction points with IdentityServer are needed.
+The workflow above needs some interaction points with the server.
 
 **Access to configuration and redirecting to the login page**
 
-You can get access to the IdentityServer configuration by injecting the `IdentityServerOptions`
-class into your code. This, e.g. has the configured path to the login page:
+Inject `OidcServerOptions` to read the server's configuration. It has, e.g., the path of the login page:
 
 ```csharp
-var returnUrl = Url.Action("Index");
-returnUrl = returnUrl.AddQueryString(Request.QueryString.Value);
+var returnUrl = QueryHelpers.AddQueryString("/wsfed", request.HttpContext.Request.Query);
 
-var loginUrl = _options.UserInteraction.LoginUrl;
-var url = loginUrl.AddQueryString(_options.UserInteraction.LoginReturnUrlParameter, returnUrl);
+var url = QueryHelpers.AddQueryString(
+    options.UserInteraction.LoginUrl!,
+    options.UserInteraction.LoginReturnUrlParameter!,
+    returnUrl);
 
-return Redirect(url);
+return Results.Redirect(url);
 ```
 
-**Interaction between the login page and current protocol request**
+(`QueryHelpers` is in `Microsoft.AspNetCore.WebUtilities`. `LoginUrl` and `LoginReturnUrlParameter` default to the
+login path and return URL parameter of the server's cookie.)
 
-The `IIdentityServerInteractionService` supports turning a protocol return URL into a
-parsed and validated context object:
+**Interaction between the login page and the current protocol request**
+
+`IOidcServerInteractionService` turns a protocol return URL into a parsed and validated context object:
 
 ```csharp
-var context = await _interaction.GetAuthorizationContextAsync(returnUrl);
+var context = await interaction.GetAuthorizationContextAsync(returnUrl);
 ```
 
-By default the interaction service only understands OpenID Connect protocol messages.
-To extend support, you can write your own `IReturnUrlParser`:
+By default the interaction service only understands OpenID Connect protocol messages. To extend it, write your own
+`IReturnUrlParser` (namespace `MinApiLib.Oidc.Server.Features.Interaction`):
 
 ```csharp
 public interface IReturnUrlParser
 {
+    Task<AuthorizationRequest?> ParseAsync(string returnUrl);
+
     bool IsValidReturnUrl(string returnUrl);
-    Task<AuthorizationRequest> ParseAsync(string returnUrl);
 }
 ```
 
-..and then register the parser in DI:
+...and register the parser in the service collection, after `AddOidcServer()`, so it is added next to the OpenID
+Connect parser:
 
 ```csharp
+builder.Services.AddOidcServer();
 builder.Services.AddTransient<IReturnUrlParser, WsFederationReturnUrlParser>();
 ```
 
-This allows the login page to get to information like the client configuration and other
-protocol parameters.
+This lets the login page get information like the client configuration and other protocol parameters.
 
 **Access to configuration and key material for creating the protocol response**
 
-By injecting the `IKeyMaterialService` into your code, you get access to the configured
-signing credential and validation keys:
+`IKeyMaterialService` (namespace `MinApiLib.Oidc.Server.Core.Keys`) gives access to the configured signing
+credentials and validation keys:
 
 ```csharp
-var credential = await _keys.GetSigningCredentialsAsync();
-var key = credential.Key as Microsoft.IdentityModel.Tokens.X509SecurityKey;
+var credentials = await keys.GetSigningCredentialsAsync();
 
 var descriptor = new SecurityTokenDescriptor
 {
-    AppliesToAddress = result.Client.ClientId,
-    Lifetime = new Lifetime(DateTime.UtcNow, DateTime.UtcNow.AddSeconds(result.Client.IdentityTokenLifetime)),
-    ReplyToAddress = result.Client.RedirectUris.First(),
-    SigningCredentials = new X509SigningCredentials(key.Certificate, result.RelyingParty.SignatureAlgorithm, result.RelyingParty.DigestAlgorithm),
-    Subject = outgoingSubject,
-    TokenIssuerName = _contextAccessor.HttpContext.GetIdentityServerIssuerUri(),
-    TokenType = result.RelyingParty.TokenType
+    Issuer = request.HttpContext.GetOidcServerIssuerUri(),
+    Audience = client.ClientId,
+    Expires = DateTime.UtcNow.AddSeconds(client.IdentityTokenLifetime),
+    SigningCredentials = credentials,
+    Subject = new ClaimsIdentity(outgoingClaims)
 };
 ```
+
+`GetOidcServerIssuerUri()` is an `HttpContext` extension in `MinApiLib.Oidc.Server.Core.Extensions`. To issue a JWT
+with the server's token creation engine instead, use [OidcServerTools](tools.md).
 
 [[go back to index]](../index.md#documentation-structure)

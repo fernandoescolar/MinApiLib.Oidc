@@ -9,14 +9,14 @@ If that token leaks, it cannot be used by anyone else (compare to a credit card 
 
 See [this](https://leastprivilege.com/2020/01/15/oauth-2-0-the-long-road-to-proof-of-possession-access-tokens/) blog post for more history and motivation.
 
-IdentityServer supports PoP tokens by using the [Mutual TLS mechanism](mtls.md#refmutualtls) and DPoP.
+MinApiLib.Oidc supports PoP tokens by using the [Mutual TLS mechanism](mtls.md#refmutualtls) and DPoP.
 
 ## DPoP
 
 With DPoP ([RFC 9449](https://www.rfc-editor.org/rfc/rfc9449)) the client proves possession of a private key it holds
 by signing a short JWT, the proof, for every request. No client certificates or TLS configuration are needed.
 
-**Token requests.** When a token request carries a `DPoP` header, IdentityServer validates the proof and binds the
+**Token requests.** When a token request carries a `DPoP` header, the server validates the proof and binds the
 access token to the key: the token carries `cnf: { "jkt": "<thumbprint>" }` and the response says
 `"token_type": "DPoP"`. Set `Client.RequireDPoP` to refuse token requests without a proof.
 
@@ -51,7 +51,7 @@ the key below, `jkt` is its thumbprint and `ath` is the hash of the access token
 end of the section.
 
 ```text
-Client (web app)                 IdentityServer                   API (resource server)
+Client (web app)                 Server                           API (resource server)
      |  1. key pair (private key never leaves the client)
      |  2. GET /connect/authorize?...&dpop_jkt=...  ->|
      |  3. POST /connect/token + DPoP proof         ->|  checks the proof, binds the token
@@ -142,7 +142,7 @@ The proof, decoded:
 <ES256 signature with the client's private key>
 ```
 
-IdentityServer checks the proof: the type, an algorithm from `DPoPOptions.SupportedSigningAlgorithms`, the signature
+The server checks the proof: the type, an algorithm from `DPoPOptions.SupportedSigningAlgorithms`, the signature
 with the key in `jwk`, `htm` and `htu` against this request, `iat` within one minute (plus one minute of clock skew)
 and that `jti` was not used before. When the code was bound with `dpop_jkt`, the proof key must be that one.
 
@@ -288,9 +288,9 @@ HTTP/1.1 401 Unauthorized
 WWW-Authenticate: DPoP error="invalid_token", error_description="DPoP-bound access token sent without the DPoP scheme", algs="ES256 PS256"
 ```
 
-The IdentityServer userinfo endpoint and the [local API](add_apis.md) handler perform these checks themselves. Their
-error responses use the `Bearer` challenge: `WWW-Authenticate: Bearer realm="IdentityServer", error="invalid_token",
-error_description="..."`.
+The server's userinfo endpoint and the [local API](add_apis.md) handler perform these checks themselves. The userinfo
+endpoint's error responses use the `Bearer` challenge: `WWW-Authenticate: Bearer realm="OidcServer",error="invalid_token",error_description="..."`.
+The local API handler answers `401` without a `WWW-Authenticate` error.
 
 ### Refreshing the token
 

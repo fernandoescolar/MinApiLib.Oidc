@@ -1,28 +1,23 @@
-# Welcome to IdentityServer
+# MinApiLib.Oidc documentation
 
-IdentityServer is an OpenID Connect and OAuth 2.0 framework for ASP.NET Core.
+MinApiLib.Oidc is OpenID Connect and OAuth 2.0 for ASP.NET Core: a server, `HttpClient` handlers that get and send
+access tokens, and DPoP (RFC 9449) support for APIs. It is built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib)
+and targets `net10.0` and `net11.0`.
 
-This project is a fork of the original IdentityServer4 project. The main goal of this fork is to provide an updated and mantained version of the original project. The original project is not being updated anymore, and the last version is 4.1.1. This fork will be updated to the latest version of .NET Core and will be maintained by @fernandoescolar.
+The server, `MinApiLib.Oidc.Server`, derives from an IdentityServer fork of
+[IdentityServer4](https://github.com/IdentityServer/IdentityServer4) 4.1.2, and this documentation from its
+documentation. The fork is kept, archived, on the `archived/identity-server` branch.
 
-- [Welcome to IdentityServer](#welcome-to-identityserver)
-  - [Documentation Structure](#documentation-structure)
-  - [About IdentityServer4](#about-identityserver4)
-  - [Features](#features)
-    - [Authentication as a Service](#authentication-as-a-service)
-    - [Single Sign-on / Sign-out](#single-sign-on--sign-out)
-    - [Access Control for APIs](#access-control-for-apis)
-    - [Federation Gateway](#federation-gateway)
-    - [Focus on Customization](#focus-on-customization)
+- [Documentation structure](#documentation-structure)
+- [What it does](#what-it-does)
 
-
-## Documentation Structure
+## Documentation structure
 
 - INTRODUCTION
   - [The Big Picture](intro/big_picture.md)
   - [Terminology](intro/terminology.md)
   - [Supported Specifications](intro/specs.md)
-  - [Packaging and Builds](intro/packaging.md)
-  - [Support and Consulting Options](intro/support.md)
+  - [Packages and Builds](intro/packaging.md)
   - [Contributing](intro/contributing.md)
 - QUICKSTARTS
   - [Overview](quickstarts/0_overview.md)
@@ -30,8 +25,8 @@ This project is a fork of the original IdentityServer4 project. The main goal of
   - [Interactive Applications with ASP.NET Core](quickstarts/2_interactive_aspnetcore.md)
   - [ASP.NET Core and API access](quickstarts/3_aspnetcore_and_apis.md)
   - [Adding a JavaScript client](quickstarts/4_javascript_client.md)
-  - [Using EntityFramework Core for configuration and operational data](quickstarts/5_entityframework.md)
-  - [Using ASP.NET Core Identity](quickstarts/6_aspnet_identity.md)
+  - [Using MongoDB for configuration and operational data](quickstarts/5_mongodb.md)
+  - [Using ASP.NET Core Identity and passkeys](quickstarts/6_aspnet_identity.md)
 - TOPICS
   - [Startup](topics/startup.md)
   - [Defining Resources](topics/resources.md)
@@ -78,53 +73,51 @@ This project is a fork of the original IdentityServer4 project. The main goal of
   - [End Session Endpoint](endpoints/endsession.md)
   - [Nonce Endpoint](endpoints/nonce.md)
 - REFERENCE
-  - [IdentityServer Options](reference/options.md)
+  - [Server Options](reference/options.md)
   - [Identity Resource](reference/identity_resource.md)
   - [API Scope](reference/api_scope.md)
   - [API Resource](reference/api_resource.md)
   - [Client](reference/client.md)
   - [GrantValidationResult](reference/grant_validation_result.md)
   - [Profile Service](reference/profileservice.md)
-  - [IdentityServer Interaction Service](reference/interactionservice.md)
+  - [Interaction Service](reference/interactionservice.md)
   - [Device Flow Interaction Service](reference/deviceflow_interactionservice.md)
-  - [ASP.NET Identity Support](reference/aspnet_identity.md)
   - [Nonce Authorization Pattern](reference/nonce_pattern.md)
-MISC
-  - [Training](misc/training.md)
-  - [Blog posts](misc/blogs.md)
-  - [Videos](misc/videos.md)
 
-## About IdentityServer4
+Each package also has a README with its API:
+[Server](../src/MinApiLib.Oidc.Server/README.md), [Server.MongoDB](../src/MinApiLib.Oidc.Server.MongoDB/README.md),
+[DPoP](../src/MinApiLib.Oidc.DPoP/README.md), [Http](../src/MinApiLib.Oidc.Http/README.md),
+[Authentication](../src/MinApiLib.Oidc.Authentication/README.md) and [JwtBearer](../src/MinApiLib.Oidc.JwtBearer/README.md).
+[samples/](../samples/README.md) has a server, a web client, an API and a worker built with them.
 
-![image](images/logo.png)
+## What it does
 
+### Authentication as a service
 
-IdentityServer is a free, open source [OpenID Connect](http://openid.net/connect/) and [OAuth 2.0](https://tools.ietf.org/html/rfc6749) framework for ASP.NET Core.
-Founded and maintained by [Dominick Baier](https://twitter.com/leastprivilege) and [Brock Allen](https://twitter.com/brocklallen), IdentityServer4 incorporates all the protocol implementations and extensibility points needed to integrate token-based authentication, single-sign-on and API access control in your applications.
-IdentityServer4 is officially [certified](https://openid.net/certification/) by the [OpenID Foundation](https://openid.net) and thus spec-compliant and interoperable.
-It is part of the [.NET Foundation](https://www.dotnetfoundation.org/), and operates under their [code of conduct](https://www.dotnetfoundation.org/code-of-conduct). It is licensed under [Apache 2](https://opensource.org/licenses/Apache-2.0) (an OSI approved license).
+One place for the sign-in of all your applications (web, native, mobile, services). The server implements OpenID
+Connect; you write the login page, so it can use passwords, passkeys, external providers or anything else.
 
-For project documentation, please visit [readthedocs](https://identityserver4.readthedocs.io).
+### Single sign-on and sign-out
 
-## Features
+One session across your applications, with front-channel and back-channel logout.
 
-### Authentication as a Service
+### Access control for APIs
 
-Centralized login logic and workflow for all of your applications (web, native, mobile, services). IdentityServer is an officially [certified](https://openid.net/certification/) implementation of OpenID Connect.
+Access tokens for APIs, for every kind of client: services (client credentials), web applications, SPAs and native
+apps. Tokens can be bound to a key with DPoP or mutual TLS, so a stolen token is useless without the key.
 
+### Federation gateway
 
-### Single Sign-on / Sign-out
+Sign in with external identity providers such as Microsoft Entra ID or Google, without your applications knowing
+the details of each one.
 
-Single sign-on (and out) over multiple application types.
+### Clients and APIs too
 
-### Access Control for APIs
+`MinApiLib.Oidc.Http` and `MinApiLib.Oidc.Authentication` get, cache, refresh and send access tokens from your
+applications, as bearer or DPoP-bound tokens. `MinApiLib.Oidc.JwtBearer` adds DPoP to ASP.NET Core JWT bearer
+authentication in APIs. They work with any OpenID Connect server.
 
-Issue access tokens for APIs for various types of clients, e.g. server to server, web applications, SPAs and native/mobile apps.
+### Open to customization
 
-### Federation Gateway
-
-Support for external identity providers like Azure Active Directory, Google, Facebook etc. This shields your applications from the details of how to connect to these external providers.
-
-### Focus on Customization
-
-The most important part - many aspects of IdentityServer can be customized to fit **your** needs. Since IdentityServer is a framework and not a boxed product or a SaaS, you can write code to adapt the system the way it makes sense for your scenarios.
+The server is a library, not a boxed product: its services are interfaces you can replace, and its endpoints are
+ordinary ASP.NET Core endpoints you can add policies to.

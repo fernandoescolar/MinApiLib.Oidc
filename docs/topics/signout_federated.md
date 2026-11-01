@@ -2,23 +2,37 @@
 
 # Federated Sign-out
 
-Federated sign-out is the situation where a user has used an external identity provider to log into IdentityServer, and then the user logs out of that external identity provider via a workflow unknown to IdentityServer.
-When the user signs out, it will be useful for IdentityServer to be notified so that it can sign the user out of IdentityServer and all of the applications that use IdentityServer.
+Federated sign-out is the case where a user signed in to the server with an external identity provider, and then
+signs out of that provider by a path the server does not know about. The server should hear about it, so it can sign
+the user out of the server and of every client application of the session.
 
-Not all external identity providers support federated sign-out, but those that do will provide a mechanism to notify clients that the user has signed out.
-This notification usually comes in the form of a request in an `<iframe>` from the external identity provider’s “logged out” page.
-IdentityServer must then notify all of its clients (as discussed [here](signout.md#refsignout)), also typically in the form of a request in an `<iframe>` from within the external identity provider’s `<iframe>`.
+Not every external provider supports federated sign-out. Those that do notify their clients that the user signed
+out, usually with a request in an `<iframe>` of the provider's "signed out" page. The server must then notify its own
+clients, [as in a normal sign-out](signout.md), also with requests in an `<iframe>`, inside the provider's one.
 
-What makes federated sign-out a special case (when compared to a normal [sign-out](signout.md#refsignout)) is that the federated sign-out request is not to the normal sign-out endpoint in IdentityServer.
-In fact, each external IdentityProvider will have a different endpoint into your IdentityServer host.
-This is due to that fact that each external identity provider might use a different protocol, and each middleware listens on different endpoints.
+What makes federated sign-out special, compared to a normal [sign-out](signout.md), is that the request does not
+arrive at the server's end session endpoint. Each external provider calls an endpoint of its own authentication
+handler in the server host, because each handler speaks a different protocol and listens on different paths (for
+example the `/signout-oidc` path of the OpenID Connect handler).
 
-The net effect of all of these factors is that there is no “logged out” page being rendered as we would on the normal sign-out workflow,
-which means we are missing the sign-out notifications to IdentityServer’s clients.
-We must add code for each of these federated sign-out endpoints to render the necessary notifications to achieve federated sign-out.
+So no "signed out" page of the host runs, and nothing renders the notifications to the server's clients. The server
+adds them itself: `AddOidcServer()` wraps the authentication handlers (`FederatedSignoutAuthenticationHandlerProvider`).
+When a handler processes a sign-out request from its provider and signs the user out of the server's session cookie,
+the server writes to the response the same front-channel logout `<iframe>` that the logout page would render.
 
-Fortunately IdentityServer already contains this code.
-When requests come into IdentityServer and invoke the handlers for external authentication providers, IdentityServer detects if these are federated signout requests and if they are it will automatically render the same `<iframe>` as [described here for signout](signout.md#refsignout).
-In short, federated signout is automatically supported.
+The handler must sign out of the server's session, so set its sign-out scheme to the session cookie scheme
+(`OidcServerConstants.SignoutScheme`, which is `idsrv`):
+
+```csharp
+builder.Services.AddAuthentication()
+    .AddOpenIdConnect("entra", "Microsoft Entra ID", options =>
+    {
+        options.SignInScheme = OidcServerConstants.ExternalCookieAuthenticationScheme;
+        options.SignOutScheme = OidcServerConstants.SignoutScheme;
+        // ...
+    });
+```
+
+With that, federated sign-out works without more code.
 
 [[go back to index]](../index.md#documentation-structure)

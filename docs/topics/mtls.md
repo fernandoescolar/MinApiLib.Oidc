@@ -1,67 +1,68 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refmutualtls"></a>
+
 # Mutual TLS
 
-Mutual TLS support in IdentityServer allows for two features:
+Mutual TLS support in the server provides two features:
 
-* Client authentication to IdentityServer endpoints using a TLS X.509 client certificate
-* Binding of access tokens to clients using a TLS X.509 client certificate
+* Client authentication to the server's endpoints with a TLS X.509 client certificate
+* Binding of access tokens to a TLS X.509 client certificate
 
 #### NOTE
-See the [“OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens”](https://tools.ietf.org/html/rfc8705) spec for more information
+See [RFC 8705, OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens](https://www.rfc-editor.org/rfc/rfc8705)
+for more information. [DPoP](pop.md#dpop) binds tokens to a key without any TLS configuration, and is usually
+simpler to deploy.
 
-Setting up MTLS involves a couple of steps.
+Setting up mTLS involves a couple of steps.
 
 ## Server setup
 
-It’s the hosting layer’s responsibility to do the actual validation of the client certificate.
-IdentityServer will then use that information to associate the certificate with a client and embed the certificate information in the access tokens.
+It's the hosting layer's responsibility to do the actual validation of the client certificate. The server then uses
+that information to associate the certificate with a client and to embed the certificate information in the access
+tokens.
 
-Depending which server you are using, those steps are different. See [this](https://leastprivilege.com/2020/02/07/mutual-tls-and-proof-of-possession-access-tokens-part-1-setup/) blog post for more information.
+The steps differ depending on the web server or proxy in front of the application. With Kestrel facing the clients
+directly, ask for the certificate in the HTTPS options. `AllowCertificate` lets clients without a certificate use the
+other endpoints:
+
+```csharp
+builder.WebHost.ConfigureKestrel(kestrel =>
+    kestrel.ConfigureHttpsDefaults(https => https.ClientCertificateMode = ClientCertificateMode.AllowCertificate));
+```
 
 #### NOTE
-[mkcert](https://github.com/FiloSottile/mkcert) is a nice utility for creating certificates for development purposes.
+[mkcert](https://github.com/FiloSottile/mkcert) is a third-party utility that creates certificates for development.
 
 ## ASP.NET Core setup
 
-Depending on the server setup, there are different ways how the ASP.NET Core host will receive the client certificate. While for IIS and pure Kestrel hosting, there are no additional steps,
-typically you have a reverse proxy in front of the application server.
+Typically a reverse proxy sits in front of the application server and terminates TLS. In addition to the usual
+forwarded headers handling, the application then reads the client certificate from a header that the proxy sets.
+Add a call to `app.UseCertificateForwarding()` at the beginning of the middleware pipeline, before `UseOidcServer()`.
 
-This means that in addition to the typical forwarded headers handling, you also need to process the header that contains the client certificate.
-Add a call to `app.UseCertificateForwarding();` in the beginning of your middleware pipeline for that.
-
-The exact format how proxies transmit the certificates is not standardized, that’s why you need to register a callback to do the actual header parsing.
-The Microsoft [docs](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/certauth?view=aspnetcore-3.1) show how that would work for Azure Web Apps.
-
-If you are using Nginx (which we found is the most flexible hosting option), you need to register the following service in `ConfigureServices`:
+The way proxies transmit the certificate is not standardized, so you register a callback that parses the header.
+Microsoft's [documentation](https://learn.microsoft.com/aspnet/core/security/authentication/certauth) shows how that
+works for Azure App Service. Nginx sends the certificate as URL-encoded PEM:
 
 ```csharp
-services.AddCertificateForwarding(options =>
+builder.Services.AddCertificateForwarding(options =>
 {
-    // header name might be different, based on your nginx config
+    // the header name depends on your nginx configuration
     options.CertificateHeader = "X-SSL-CERT";
 
-    options.HeaderConverter = (headerValue) =>
-    {
-        X509Certificate2 clientCertificate = null;
-
-        if(!string.IsNullOrWhiteSpace(headerValue))
-        {
-            var bytes = Encoding.UTF8.GetBytes(Uri.UnescapeDataString(headerValue));
-            clientCertificate = new X509Certificate2(bytes);
-        }
-
-        return clientCertificate;
-    };
+    options.HeaderConverter = headerValue =>
+        string.IsNullOrWhiteSpace(headerValue)
+            ? null
+            : X509Certificate2.CreateFromPem(Uri.UnescapeDataString(headerValue));
 });
 ```
 
-Once, the certificate has been loaded, you also need to setup the authentication handler.
-In this scenario we want to support self-signed certificates, hence the `CertificateType.All` and no revocation checking.
-These settings might be different in your environment:
+Once the certificate is loaded, set up the certificate authentication handler. This example accepts self-signed
+certificates, hence `CertificateTypes.All` and no revocation checking. These settings might be different in your
+environment:
 
 ```csharp
-services.AddAuthentication()
+builder.Services.AddAuthentication()
     .AddCertificate(options =>
     {
         options.AllowedCertificateTypes = CertificateTypes.All;
@@ -69,142 +70,153 @@ services.AddAuthentication()
     });
 ```
 
-## IdentityServer setup
+## MinApiLib.Oidc.Server setup
 
-Next step is to enable MTLS in IdentityServer. For that you need to specify the name of the certificate authentication handler you set-up in the last step (defaults to `Certificate`),
-and the MTLS hosting strategy.
+Next, enable mTLS in the server with `OidcServerOptions.MutualTls` (`MutualTlsOptions`). Specify the name of the
+certificate authentication handler you set up in the last step (`ClientCertificateAuthenticationScheme`, `Certificate`
+by default) and where the mTLS endpoints live (`DomainName`).
 
-In IdentityServer, the mutual TLS endpoints, can be configured in three ways (assuming IdentityServer is running on `https://identityserver.io`:
+The mTLS endpoints can be hosted in three ways, assuming the server runs on `https://login.example.com`:
 
-* path-based - endpoints located beneath the path `~/connect/mtls`, e.g. `https://identityserver.io/connect/mtls/token`.
-* sub-domain based - endpoints are on a sub-domain of the main server, e.g. `https://mtls.identityserver.io/connect/token`.
-* domain-based - endpoints are on a different domain, e.g. `https://identityserver-mtls.io`.
+* path-based (`DomainName` not set): endpoints beneath `/connect/mtls`, e.g. `https://login.example.com/connect/mtls/token`.
+  Every `connect/` route has this alias; it answers `404` in the other two modes.
+* sub-domain based (`DomainName` without dots, e.g. `mtls`): endpoints on a sub-domain of the main server, e.g.
+  `https://mtls.login.example.com/connect/token`.
+* domain-based (`DomainName` with dots, e.g. `mtls.example.com`): endpoints on a different domain, e.g.
+  `https://mtls.example.com/connect/token`. In this case set a static `IssuerUri`.
 
 For example:
 
 ```csharp
-var builder = services.AddIdentityServer(options =>
-{
-    options.MutualTls.Enabled = true;
-    options.MutualTls.ClientCertificateAuthenticationScheme = "Certificate";
+builder.Services.AddOidcServer(options =>
+    {
+        options.MutualTls.Enabled = true;
+        options.MutualTls.ClientCertificateAuthenticationScheme = "Certificate";
 
-    // uses sub-domain hosting
-    options.MutualTls.DomainName = "mtls";
-});
+        // uses sub-domain hosting
+        options.MutualTls.DomainName = "mtls";
+    })
+    .AddMutualTlsSecretValidators();
 ```
 
-IdentityServer’s discovery document reflects those endpoints:
+On those endpoints `UseOidcServer()` authenticates the client certificate with that scheme, and answers `403` when
+it fails. The discovery document lists the token, revocation, introspection, pushed authorization and device
+authorization endpoints in `mtls_endpoint_aliases`:
 
-![image](topics/images/mtls_endpoints.png)
+![image](images/mtls_endpoints.png)
 
 ## Client authentication
 
-Clients can use a X.509 client certificate as an authentication mechanism to endpoints in IdentityServer.
+Clients can authenticate to the server's endpoints with an X.509 client certificate. For this, associate a client
+certificate with a client. `AddMutualTlsSecretValidators()` on the [builder](startup.md) adds the services that do
+that, either by thumbprint or by distinguished name, and discovery then announces `tls_client_auth` and
+`self_signed_tls_client_auth`.
 
-For this you need to associate a client certificate with a client in IdentityServer.
-Use the [IdentityServer builder](startup.md#refstartup) to add the services to DI which contain a default implementation to do that either thumbprint or common-name based:
-
-```csharp
-builder.AddMutualTlsSecretValidators();
-```
-
-Finally, for the [client configuration](../reference/client.md#refclient) add to the `ClientSecrets` collection a secret type of either `SecretTypes.X509CertificateName`
-if you wish to authenticate the client from the certificate distinguished name or `SecretTypes.X509CertificateThumbprint` if you wish to authenticate the client by certificate thumbprint.
-
-For example:
+Then, in the [client configuration](../reference/client.md), add to `ClientSecrets` a secret of type
+`OidcServerConstants.SecretTypes.X509CertificateName` to authenticate the client by the certificate's distinguished
+name, or `OidcServerConstants.SecretTypes.X509CertificateThumbprint` to authenticate it by the certificate's
+thumbprint. For example:
 
 ```csharp
 new Client
 {
-    ClientId = "mtls",
+    ClientId = "orders.worker",
     AllowedGrantTypes = GrantTypes.ClientCredentials,
-    AllowedScopes = { "api1" }
+    AllowedScopes = { "orders.read" },
     ClientSecrets =
     {
         // name based
-        new Secret(@"CN=mtls.test, OU=ROO\ballen@roo, O=mkcert development certificate", "mtls.test")
+        new Secret("CN=orders.worker, O=Example", "orders worker certificate")
         {
-            Type = SecretTypes.X509CertificateName
+            Type = OidcServerConstants.SecretTypes.X509CertificateName
         },
         // or thumbprint based
-        //new Secret("bca0d040847f843c5ee0fa6eb494837470155868", "mtls.test")
+        //new Secret("bca0d040847f843c5ee0fa6eb494837470155868", "orders worker certificate")
         //{
-        //    Type = SecretTypes.X509CertificateThumbprint
+        //    Type = OidcServerConstants.SecretTypes.X509CertificateThumbprint
         //},
-    },
+    }
 }
 ```
 
-### Using a client certificate to authenticate to IdentityServer
+### Using a client certificate to authenticate to the server
 
-When writing a client to connect to IdentityServer, the `SocketsHttpHandler` (or `HttpClientHandler` if you are on older .NET Framework versions)
-class provides a convenient mechanism to add a client certificate to outgoing requests.
+The client sends its token request to the mTLS endpoint over a TLS connection where it presents its certificate. It
+sends only its `client_id`; the certificate is the credential:
 
-And then HTTP calls (including using the various [IdentityModel](https://github.com/IdentityModel/IdentityModel2) extension methods) with the `HttpClient`
-will perform client certificate authentication at the TLS channel.
+```http
+POST /connect/token HTTP/1.1
+Host: mtls.login.example.com
+Content-Type: application/x-www-form-urlencoded
 
-For example:
+grant_type=client_credentials&client_id=orders.worker&scope=orders.read
+```
+
+With [MinApiLib.Oidc.Http](../../src/MinApiLib.Oidc.Http/README.md), point `TokenEndpoint` at the mTLS endpoint and give
+the certificate to the HTTP client that sends token requests, `OidcHttpDefaults.HttpClientName`:
 
 ```csharp
-static async Task<TokenResponse> RequestTokenAsync()
-{
-    var handler = new SocketsHttpHandler();
-    var cert = new X509Certificate2("client.p12", "password");
-    handler.SslOptions.ClientCertificates = new X509CertificateCollection { cert };
+var certificate = X509CertificateLoader.LoadPkcs12FromFile("orders.worker.p12", password);
 
-    var client = new HttpClient(handler);
-
-    var disco = await client.GetDiscoveryDocumentAsync(Constants.Authority);
-    if (disco.IsError) throw new Exception(disco.Error);
-
-    var response = await client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
+builder.Services.AddHttpClient(OidcHttpDefaults.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
     {
-        Address = disco
-                        .TryGetValue(OidcConstants.Discovery.MtlsEndpointAliases)
-                        .Value<string>(OidcConstants.Discovery.TokenEndpoint)
-                        .ToString(),
-
-        ClientId = "mtls",
-        Scope = "api1"
+        SslOptions = { ClientCertificates = new X509CertificateCollection { certificate } }
     });
 
-    if (response.IsError) throw new Exception(response.Error);
-    return response;
-}
+builder.Services.AddClientCredentialsTokens("orders", options =>
+{
+    options.TokenEndpoint = "https://mtls.login.example.com/connect/token";
+    options.ClientId = "orders.worker";
+    options.Scope = "orders.read";
+});
+
+builder.Services.AddHttpClient("orders", client => client.BaseAddress = new Uri("https://orders.example.com"))
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        SslOptions = { ClientCertificates = new X509CertificateCollection { certificate } }
+    })
+    .AddClientCredentialsTokenHandler("orders");
 ```
+
+The API client presents the same certificate, so the API can check the binding described below.
 
 ## Sender-constrained access tokens
 
-Whenever a client authenticates to IdentityServer using a client certificate, the thumbprint of that certificate will be embedded in the access token.
+Whenever a client authenticates to the server with a client certificate, the thumbprint of that certificate is
+embedded in the access token.
 
-Clients can use a X.509 client certificate as a mechanism for sender-constrained access tokens when authenticating to APIs.
-The use of these sender-constrained access tokens requires the client to use the same X.509 client certificate to authenticate to the API as the one used for IdentityServer.
+Clients can use an X.509 client certificate as a mechanism for sender-constrained access tokens when calling APIs.
+This requires the client to present to the API the same certificate it used at the server.
 
 ### Confirmation claim
 
-When a client obtains an access token and has authenticated with mutual TLS, IdentityServer issues a confirmation claim (or `cnf`) in the access token.
-This value is a hash of the thumbprint of the client certificate used to authenticate with IdentityServer.
+When a client gets an access token after authenticating with mutual TLS, the server issues a confirmation claim
+(`cnf`) in the access token. It holds the SHA-256 thumbprint of the client certificate, base64url-encoded, as
+`x5t#S256`. A token request that carries a DPoP proof is bound to the DPoP key instead (`cnf.jkt`).
 
-This value can be seen in this screen shot of a decoded access token:
+This value can be seen in this screenshot of a decoded access token:
 
-![image](topics/images/mtls_access_token_with_cnf.png)
+![image](images/mtls_access_token_with_cnf.png)
 
-The API will then use this value to ensure the client certificate being used at the API matches the confirmation value in the access token.
+The API then uses this value to ensure the client certificate used at the API matches the confirmation value in the
+access token. [How mutual TLS works, step by step](pop.md#how-mutual-tls-works-step-by-step) shows the whole exchange.
 
 ### Validating and accepting a client certificate in APIs
 
-As mentioned above for client authentication in IdentityServer, in the API the web server is expected to perform the client certificate validation at the TLS layer.
+As for client authentication at the server, the web server in front of the API is expected to validate the client
+certificate at the TLS layer.
 
-Additionally, the API hosting application will need a mechanism to accept the client certificate in order to obtain the thumbprint to perform the confirmation claim validation.
-Below is an example how an API in ASP.NET Core might be configured for both access tokens and client certificates:
+Additionally, the API needs the certificate to compute its thumbprint and compare it with the confirmation claim.
+Below is an example of an ASP.NET Core API configured for both access tokens and client certificates:
 
 ```csharp
-services.AddAuthentication("token")
-    .AddIdentityServerAuthentication("token", options =>
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        options.Authority = "https://identityserver.io";
-        options.ApiName = "api1";
-
+        options.Authority = "https://login.example.com";
+        options.Audience = "orders";
+        options.MapInboundClaims = false;
     })
     .AddCertificate(options =>
     {
@@ -212,108 +224,86 @@ services.AddAuthentication("token")
     });
 ```
 
-Finally, a mechanism is needed that runs after the authentication middleware to authenticate the client certificate and compare the thumbprint to the `cnf` from the access token.
-
-Below is a simple middleware that checks the claims:
+Neither handler compares the certificate with the `cnf` claim, so the API adds a small middleware that runs after
+authentication:
 
 ```csharp
-public class ConfirmationValidationMiddlewareOptions
+// Checks the cnf claim of the access token (if present) against the thumbprint of the client certificate.
+app.Use(async (context, next) =>
 {
-    public string CertificateSchemeName { get; set; } = CertificateAuthenticationDefaults.AuthenticationScheme;
-    public string JwtBearerSchemeName { get; set; } = JwtBearerDefaults.AuthenticationScheme;
-}
-
-// this middleware validate the cnf claim (if present) against the thumbprint of the X.509 client certificate for the current client
-public class ConfirmationValidationMiddleware
-{
-    private readonly RequestDelegate _next;
-    private readonly ConfirmationValidationMiddlewareOptions _options;
-
-    public ConfirmationValidationMiddleware(RequestDelegate next, ConfirmationValidationMiddlewareOptions options = null)
+    var cnf = context.User.FindFirst("cnf")?.Value;
+    if (cnf != null)
     {
-        _next = next;
-        _options = options ?? new ConfirmationValidationMiddlewareOptions();
-    }
-
-    public async Task Invoke(HttpContext ctx)
-    {
-        if (ctx.User.Identity.IsAuthenticated)
+        var certificateResult = await context.AuthenticateAsync(CertificateAuthenticationDefaults.AuthenticationScheme);
+        if (!certificateResult.Succeeded)
         {
-            var cnfJson = ctx.User.FindFirst("cnf")?.Value;
-            if (!String.IsNullOrWhiteSpace(cnfJson))
-            {
-                var certResult = await ctx.AuthenticateAsync(_options.CertificateSchemeName);
-                if (!certResult.Succeeded)
-                {
-                    await ctx.ChallengeAsync(_options.CertificateSchemeName);
-                    return;
-                }
-
-                var certificate = await ctx.Connection.GetClientCertificateAsync();
-                var thumbprint = Base64UrlTextEncoder.Encode(certificate.GetCertHash(HashAlgorithmName.SHA256));
-
-                var cnf = JObject.Parse(cnfJson);
-                var sha256 = cnf.Value<string>("x5t#S256");
-
-                if (String.IsNullOrWhiteSpace(sha256) ||
-                    !thumbprint.Equals(sha256, StringComparison.Ordinal))
-                {
-                    await ctx.ChallengeAsync(_options.JwtBearerSchemeName);
-                    return;
-                }
-            }
+            await context.ChallengeAsync(CertificateAuthenticationDefaults.AuthenticationScheme);
+            return;
         }
 
-        await _next(ctx);
+        var certificate = await context.Connection.GetClientCertificateAsync();
+        var thumbprint = Base64Url.EncodeToString(certificate!.GetCertHash(HashAlgorithmName.SHA256));
+
+        using var json = JsonDocument.Parse(cnf);
+        var bound = json.RootElement.TryGetProperty("x5t#S256", out var value) ? value.GetString() : null;
+
+        if (bound == null || !string.Equals(thumbprint, bound, StringComparison.Ordinal))
+        {
+            await context.ChallengeAsync(JwtBearerDefaults.AuthenticationScheme);
+            return;
+        }
     }
+
+    await next(context);
+});
 ```
 
-Below is an example pipeline for an API:
+The API's pipeline:
 
 ```csharp
 app.UseForwardedHeaders(new ForwardedHeadersOptions
-    {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-    });
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseCertificateForwarding();
 app.UseRouting();
 app.UseAuthentication();
 
-app.UseMiddleware<ConfirmationValidationMiddleware>(new ConfirmationValidationMiddlewareOptions
-{
-    CertificateSchemeName = CertificateAuthenticationDefaults.AuthenticationScheme,
-    JwtBearerSchemeName = "token"
-});
+// the cnf middleware above
 
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapControllers();
-});
+app.MapEndpoints();
+
+app.Run();
 ```
 
-Once the above middleware succeeds, then the caller has been authenticated with a sender-constrained access token.
+Once the middleware succeeds, the caller has been authenticated with a sender-constrained access token. A token bound
+with DPoP (`cnf.jkt`) has no `x5t#S256` and is rejected by this middleware: an API that accepts both checks DPoP with
+`AddDPoP()` from [MinApiLib.Oidc.JwtBearer](../../src/MinApiLib.Oidc.JwtBearer/README.md) and limits the
+certificate check to tokens with `x5t#S256`.
 
 ### Introspection and the confirmation claim
 
-When the access token is a JWT, then the confirmation claim is contained in the token as a claim.
-When using reference tokens, the claims that the access token represents must be obtained via introspection.
-The introspection endpoint in IdentityServer will return a `cnf` claim for reference tokens obtained via mutual TLS.
+When the access token is a JWT, the confirmation claim is in the token. When using reference tokens, the API gets the
+claims through [introspection](../endpoints/introspection.md), which returns the `cnf` claim of tokens obtained via
+mutual TLS.
 
 ## Ephemeral client certificates
 
-You can use the IdentityServer MTLS support also to create sender-constrained access tokens without using the client certificate for client authentication.
-This is useful for situations where you already have client secrets in place that you don’t want to change, e.g. shared secrets, or better private key JWTs.
+You can also use mTLS to create sender-constrained access tokens without using the client certificate for client
+authentication. This is useful when the clients already have credentials you don't want to change, e.g. shared
+secrets, or better private key JWTs.
 
-Still, if a client certificate is present, the confirmation claim can be embedded in outgoing access tokens. And as long as the client is using the same client certificate to
-request the token and calling the API, this will give you the desired proof-of-possession properties.
+If a client certificate is present, the confirmation claim can still be embedded in the access tokens. As long as the
+client uses the same client certificate to request the token and to call the API, this gives you the desired
+proof-of-possession properties.
 
-For this enable the following setting in the options:
+For this, enable the following option:
 
 ```csharp
-var builder = services.AddIdentityServer(options =>
+builder.Services.AddOidcServer(options =>
 {
     // other settings
 
@@ -323,65 +313,44 @@ var builder = services.AddIdentityServer(options =>
 
 ### Using an ephemeral certificate to request a token
 
-In this scenario, the client uses *some* client secret (a shared secret in the below sample), but attaches an additional client certificate to the token request.
-Since this certificate does not need to be associated with the client at the token services, it can be created on the fly:
+In this scenario the client authenticates with its usual credentials (a shared secret below), but presents an
+additional client certificate on the TLS connection of the token request. Since this certificate does not need to be
+registered with the client at the server, the client can create it on the fly:
 
 ```csharp
 static X509Certificate2 CreateClientCertificate(string name)
 {
-    X500DistinguishedName distinguishedName = new X500DistinguishedName($"CN={name}");
+    using var rsa = RSA.Create(2048);
+    var request = new CertificateRequest($"CN={name}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
-    using (RSA rsa = RSA.Create(2048))
-    {
-        var request = new CertificateRequest(distinguishedName, rsa, HashAlgorithmName.SHA256,RSASignaturePadding.Pkcs1);
+    request.CertificateExtensions.Add(
+        new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
 
-        request.CertificateExtensions.Add(
-            new X509KeyUsageExtension(X509KeyUsageFlags.DataEncipherment | X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DigitalSignature , false));
+    request.CertificateExtensions.Add(
+        new X509EnhancedKeyUsageExtension(new OidCollection { new Oid("1.3.6.1.5.5.7.3.2") }, false));   // client authentication
 
-        request.CertificateExtensions.Add(
-            new X509EnhancedKeyUsageExtension(
-                new OidCollection { new Oid("1.3.6.1.5.5.7.3.2") }, false));
-
-        return request.CreateSelfSigned(new DateTimeOffset(DateTime.UtcNow.AddDays(-1)), new DateTimeOffset(DateTime.UtcNow.AddDays(10)));
-    }
+    return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(10));
 }
 ```
 
-Then use this client certificate in addition to the already setup-up client secret:
+Then use this certificate in addition to the client secret. With MinApiLib.Oidc.Http, configure the HTTP clients as
+in [the example above](#using-a-client-certificate-to-authenticate-to-the-server) and keep the secret:
 
 ```csharp
-static async Task<TokenResponse> RequestTokenAsync()
+var certificate = CreateClientCertificate("orders.worker");
+
+// OidcHttpDefaults.HttpClientName and the API client present `certificate`, as above
+
+builder.Services.AddClientCredentialsTokens("orders", options =>
 {
-    var client = new HttpClient(GetHandler(ClientCertificate));
-
-    var disco = await client.GetDiscoveryDocumentAsync("https://identityserver.local");
-    if (disco.IsError) throw new Exception(disco.Error);
-
-    var endpoint = disco
-        .TryGetValue(OidcConstants.Discovery.MtlsEndpointAliases)
-        .Value<string>(OidcConstants.Discovery.TokenEndpoint)
-        .ToString();
-
-    var response = await client.RequestClientCredentialsTokenAsync(new ClientCredentialsTokenRequest
-    {
-        Address = endpoint,
-
-        ClientId = "client",
-        ClientSecret = "secret",
-        Scope = "api1"
-    });
-
-    if (response.IsError) throw new Exception(response.Error);
-    return response;
-}
-
-static SocketsHttpHandler GetHandler(X509Certificate2 certificate)
-{
-    var handler = new SocketsHttpHandler();
-    handler.SslOptions.ClientCertificates = new X509CertificateCollection { certificate };
-
-    return handler;
-}
+    options.TokenEndpoint = "https://mtls.login.example.com/connect/token";
+    options.ClientId = "orders.worker";
+    options.ClientSecret = "secret";
+    options.Scope = "orders.read";
+});
 ```
+
+The token request goes to an mTLS endpoint, where the server asks for the certificate; the client still
+authenticates with its secret.
 
 [[go back to index]](../index.md#documentation-structure)

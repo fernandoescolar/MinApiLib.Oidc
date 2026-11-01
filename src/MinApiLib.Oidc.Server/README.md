@@ -184,7 +184,16 @@ endpoint itself answered, with a 405 or, at the token, device authorization and 
 | `IdentityServerEndpointMetadata.HandlerType` | `OidcServerEndpointMetadata.EndpointType` |
 
 The protocol values are unchanged. These include the cookie names (`idsrv`, `idsrv.session`,
-`idsrv.external`), the routes, the token formats and the discovery document.
+`idsrv.external`), the routes, the token formats and the discovery document. The values that carried the product
+name are renamed:
+
+| IdentityServer | MinApiLib.Oidc.Server |
+|---|---|
+| Local API scope `IdentityServerApi` | `OidcServerApi` (`OidcServerConstants.LocalApi.ScopeName`) |
+| Local API scheme `IdentityServerAccessToken` | `OidcServerAccessToken` |
+| `realm="IdentityServer"` in the userinfo endpoint's `WWW-Authenticate` header | `realm="OidcServer"` |
+| CORS policy name `IdentityServer` | `OidcServer` (`CorsOptions.CorsPolicyName`) |
+| Authentication type of `IdentityServerUser` principals | `OidcServer` |
 
 One addition is off by default. With `options.Authentication.EnforceAcrValues`, the authorize endpoint requires the
 session's `acr` claim to be one of the request's `acr_values`; the `idp:` and `tenant:` values are not checked.

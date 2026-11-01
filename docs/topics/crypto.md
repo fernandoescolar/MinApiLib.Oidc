@@ -1,77 +1,113 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refcrypto"></a>
+
 # Cryptography, Keys and HTTPS
 
-IdentityServer relies on a couple of crypto mechanisms to do its job.
+The server relies on a couple of crypto mechanisms to do its job.
 
 ## Token signing and validation
 
-IdentityServer needs an asymmetric key pair to sign and validate JWTs.
-This keymaterial can be either packaged as a certificate or just raw keys.
-Both RSA and ECDSA keys are supported and the supported signing algorithms are: RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 and ES512.
+The server needs an asymmetric key pair to sign and validate JWTs. The key material can be a certificate or raw keys.
+Both RSA and ECDSA keys are supported, with the signing algorithms RS256, RS384, RS512, PS256, PS384, PS512, ES256,
+ES384 and ES512.
 
-You can use multiple signing keys simultaneously, but only one signing key per algorithm is supported.
-The first signing key you register is considered the default signing key.
+You can use several signing keys at once, but only one per algorithm. The first one you register is the default
+signing key.
 
-Both [clients](../reference/client.md#refclient) and [API resources](../reference/api_resource.md#refapiresource) can express preferences on the signing algorithm.
-If you request a single token for multiple API resources, all resources need to agree on at least one allowed signing algorithm.
+Both [clients](../reference/client.md) and [API resources](../reference/api_resource.md) can express preferences on
+the signing algorithm (`AllowedIdentityTokenSigningAlgorithms` on the client, `AllowedAccessTokenSigningAlgorithms` on
+the API resource). If you request a single token for several API resources, they need to agree on at least one
+algorithm.
 
-Loading of signing key and the corresponding validation part is done by implementations of `ISigningCredentialStore` and `IValidationKeysStore`.
-If you want to customize the loading of the keys, you can implement those interfaces and register them with DI.
+The keys are loaded by implementations of `ISigningCredentialStore` and `IValidationKeysStore` (namespace
+`MinApiLib.Oidc.Server.Core.Keys`). `IKeyMaterialService` combines them with the automatic keys described below. To
+load keys your own way, implement the stores and register them in the container.
 
-The DI builder extensions has a couple of convenience methods to set signing and validation keys - see [here](startup.md#refstartupkeymaterial).
+The builder has methods to add static signing and validation keys: `AddSigningCredential`,
+`AddDeveloperSigningCredential` and `AddValidationKey`. See [here](startup.md#refstartupkeymaterial).
+
+```csharp
+builder.Services.AddOidcServer()
+    .AddSigningCredential(X509CertificateLoader.LoadPkcs12FromFile("signing.pfx", builder.Configuration["SigningKeyPassword"]));
+```
+
+`AddDeveloperSigningCredential` creates an RSA key and keeps it in `tempkey.jwk`. Use it only for development: the
+server logs a warning when it is used outside the Development environment.
 
 ## Signing key rollover
 
-While you can only use one signing key at a time, you can publish more than one validation key to the discovery document.
-This is useful for key rollover.
+While you can only sign with one key per algorithm at a time, you can publish more than one validation key in the
+discovery document. This is how keys are rolled over by hand:
 
-In a nutshell, a rollover typically works like this:
+1. create the new key material;
+2. publish the new validation key next to the current one, with `AddValidationKey`;
+3. clients and APIs learn about the new key the next time they refresh their copy of the discovery document;
+4. after some time (for example 24 hours), all clients and APIs accept both the old and the new key;
+5. sign with the new key, and keep publishing the old one for as long as tokens it signed can still be in use;
+6. retire the old key;
+7. clients and APIs forget the old key the next time they refresh their copy of the discovery document.
 
-1. you request/create new key material
-2. you publish the new validation key in addition to the current one. You can use the `AddValidationKey` builder extension method for that.
-3. all clients and APIs now have a chance to learn about the new key the next time they update their local copy of the discovery document
-4. after a certain amount of time (e.g. 24h) all clients and APIs should now accept both the old and the new key material
-5. keep the old key material around for as long as you like, maybe you have long-lived tokens that need validation
-6. retire the old key material when it is not used anymore
-7. all clients and APIs will “forget” the old key next time they update their local copy of the discovery document
-
-This requires that clients and APIs use the discovery document, and also have a feature to periodically refresh their configuration.
-
-Brock wrote a more detailed [blog post](https://brockallen.com/2019/08/09/identityserver-and-signing-key-rotation/) about key rotation.
+This requires that clients and APIs use the discovery document and refresh it periodically. Automatic key management
+does all of this for you.
 
 ## Automatic key management
 
-This fork can create and rotate signing keys itself. It is off by default:
+The server can create and rotate its signing keys itself. It is off by default:
 
 ```csharp
-services.AddIdentityServer(options =>
+builder.Services.AddOidcServer(options =>
 {
     options.KeyManagement.Enabled = true;
-    options.KeyManagement.SigningAlgorithms = new[] { "RS256", "ES256" };
+    options.KeyManagement.SigningAlgorithms = ["RS256", "ES256"];
 });
 ```
 
-For each algorithm, a key is published in the discovery document as soon as it is created. It starts signing after
-`PropagationTime` (14 days), signs until `RotationInterval` (90 days) and stays published for `RetentionDuration`
-(14 more days) to validate the tokens it signed. It is then deleted. The next key is created `PropagationTime` before
-the current one retires. At first start the new key signs immediately, because there is nothing to roll over from.
+`OidcServerOptions.KeyManagement` is a `KeyManagementOptions`:
 
-Keys are stored by `ISigningKeyStore`. The default `FileSystemSigningKeyStore` writes to `KeyManagementOptions.KeyPath`
-(a `keys` folder in the current directory). The private key is encrypted with ASP.NET Core data protection
-(`DataProtectKeys`), so all instances must share both the key store and the data protection key ring. Each instance
-reloads keys every `KeyCacheDuration` (one hour).
+| Option | Default | |
+|---|---|---|
+| `Enabled` | `false` | Create and rotate signing keys |
+| `SigningAlgorithms` | RS256 | One key per algorithm; the first is the default |
+| `RotationInterval` | 90 days | How long a key signs, counted from its creation |
+| `PropagationTime` | 14 days | How long a new key is published before it signs |
+| `RetentionDuration` | 14 days | How long a retired key stays published |
+| `DeleteRetiredKeys` | `true` | Delete keys from the store after their retention |
+| `KeyCacheDuration` | 1 hour | How long each instance caches the keys it loaded |
+| `DataProtectKeys` | `true` | Encrypt the private keys with ASP.NET Core data protection |
+| `KeyPath` | `./keys` | Directory of the default file system store |
+
+For each algorithm, a key is published in the discovery document as soon as it is created. It starts signing after
+`PropagationTime`, signs until `RotationInterval` and then stays published for `RetentionDuration` to validate the
+tokens it signed. The next key is created `PropagationTime` before the current one retires. At first start the new
+key signs immediately, because there is nothing to roll over from.
+
+Keys are kept in an `ISigningKeyStore`, which every instance of the server must share:
+
+* `FileSystemSigningKeyStore`, the default, writes one JSON file per key to `KeyPath`. It suits a single instance or
+  a shared volume.
+* `MinApiLib.Oidc.Server.MongoDB` keeps the keys in its `signingKeys` collection when `AddMongoStores` is called
+  (`MongoStoreOptions.UseForSigningKeys`, on by default).
+* `InMemorySigningKeyStore` loses the keys on restart; use it only for tests.
+* Your own: implement `LoadKeysAsync`, `StoreKeyAsync` and `DeleteKeyAsync` and register it as the
+  `ISigningKeyStore`.
+
+With `DataProtectKeys`, all instances must also share the data protection key ring; a key protected with another key
+ring cannot be loaded, and the server logs an error. Each instance reloads the keys every `KeyCacheDuration`, which must
+be shorter than `PropagationTime`. Inconsistent `KeyManagement` options stop the host from starting.
 
 Static credentials added with `AddSigningCredential` are still published. Automatic keys sign for the algorithms they
 cover, and static credentials sign for any other algorithm.
 
 ## Data protection
 
-Cookie authentication in ASP.NET Core (or anti-forgery in MVC) use the ASP.NET Core data protection feature.
-Depending on your deployment scenario, this might require additional configuration. See the Microsoft [docs](https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/configuration/overview) for more information.
+Cookie authentication and antiforgery in ASP.NET Core use the ASP.NET Core data protection feature, and so do
+several parts of the server (the protected private keys above, among others). With several instances, or keys that
+must survive a restart, the key ring needs configuration. See the Microsoft
+[docs](https://learn.microsoft.com/aspnet/core/security/data-protection/configuration/overview).
 
 ## HTTPS
 
-We don’t enforce the use of HTTPS, but for production it is mandatory for every interaction with IdentityServer.
+The server does not enforce HTTPS, but in production it is mandatory for every interaction with it.
 
 [[go back to index]](../index.md#documentation-structure)

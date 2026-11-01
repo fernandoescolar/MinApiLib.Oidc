@@ -2,415 +2,468 @@
 
 # Interactive Applications with ASP.NET Core
 
-#### NOTE
-For any pre-requisites (like e.g. templates) have a look at the [overview](0_overview.md#refquickstartoverview) first.
+In this quickstart you add interactive user authentication with OpenID Connect to the server of the
+[previous quickstart](1_client_credentials.md), and create an ASP.NET Core web application that signs users in with
+it.
 
-In this quickstart we want to add support for interactive user authentication via the
-OpenID Connect protocol to our IdentityServer we built in the previous chapter.
-
-Once that is in place, we will create an MVC application that will use IdentityServer for
-authentication.
+Do the [preparation](0_overview.md#preparation) and [quickstart 1](1_client_credentials.md) first. The finished code
+is in [samples/](../../samples/README.md): `Server` and `WebClient`.
 
 ## Adding the UI
 
-All the protocol support needed for OpenID Connect is already built into IdentityServer.
-You need to provide the necessary UI parts for login, logout, consent and error.
+The server implements the protocol, but it has no UI: the host writes its own login, logout and error pages (and a
+consent page, if clients require consent). There is no ready-made UI package or template. The sample server has
+minimal pages; this quickstart builds a smaller version of them.
 
-While the look & feel as well as the exact workflows will probably always differ in every
-IdentityServer implementation, we provide an MVC-based sample UI that you can use as a starting point.
+This is how the server and the login page work together:
 
-This UI can be found in the [Quickstart UI repo](https://github.com/IdentityServer/IdentityServer4.Quickstart.UI/tree/main).
-You can clone or download this repo and drop the controllers, views, models and CSS into your IdentityServer web application.
+1. A client sends the user to the authorize endpoint. The user has no session, so the server redirects to the login
+   page, with the authorize request in the return URL:
+   `/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb...`.
+2. The login page reads the request from the return URL with `IOidcServerInteractionService.GetAuthorizationContextAsync`:
+   the client, `login_hint`, `acr_values`, the requested scopes and so on.
+3. Once it has checked the user's credentials, the page signs the user in to the server's cookie with
+   `HttpContext.SignInAsync(OidcServerUser)`, and redirects back to the return URL.
+4. The authorize endpoint finds the session and answers the client.
 
-Alternatively you can use the .NET CLI (run from within the `src/IdentityServer` folder):
+By default the server sends the user to `/Account/Login` with a `ReturnUrl` parameter (the defaults of the ASP.NET
+Core cookie handler), to `/Account/Logout` with a `logoutId` parameter, and to `/home/error` with an `errorId`
+parameter. Routes are not case sensitive. `options.UserInteraction` changes them (`LoginUrl`,
+`LoginReturnUrlParameter`, `LogoutUrl`, `ErrorUrl`, ...); see [Server Options](../reference/options.md).
 
-```csharp
-dotnet new is4ui
-```
+### The users
 
-Once you have added the MVC UI, you will also need to enable MVC, both in the DI system and in the pipeline.
-When you look at `Startup.cs` you will find comments in the `ConfigureServices` and `Configure` method that tell you how to enable MVC.
-
-#### NOTE
-There is also a template called `is4inmem` which combines a basic IdentityServer including the standard UI.
-
-Run the IdentityServer application, you should now see a home page.
-
-Spend some time inspecting the controllers and models - especially the `AccountController` which is the main UI entry point.
-The better you understand them, the easier it will be to make future modifications.
-Most of the code lives in the “Quickstart” folder using a “feature folder” style.
-If this style doesn’t suit you, feel free to organize the code in any way you want.
-
-## Creating an MVC client
-
-Next you will create an MVC application.
-Use the ASP.NET Core “Web Application” (i.e. MVC) template for that.
-
-run from the src folder:
+The quickstart keeps two users in code, with their passwords in clear text, to keep the focus on the protocol. Add a
+`Users.cs` file to the server:
 
 ```csharp
-dotnet new mvc -n MvcClient
-cd ..
-dotnet sln add .\src\MvcClient\MvcClient.csproj
-```
+public sealed record User(string Id, string UserName, string Password, string Name, string Email);
 
-#### NOTE
-We recommend using the self-host option over IIS Express. The rest of the docs assume you are using self-hosting on port 5002.
-
-To add support for OpenID Connect authentication to the MVC application, you first need to add the nuget package containing the OpenID Connect handler to your project, e.g.:
-
-```csharp
-dotnet add package Microsoft.AspNetCore.Authentication.OpenIdConnect
-```
-
-..then add the following to `ConfigureServices` in `Startup`:
-
-```csharp
-using System.IdentityModel.Tokens.Jwt;
-
-// ...
-
-JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
-
-services.AddAuthentication(options =>
-    {
-        options.DefaultScheme = "Cookies";
-        options.DefaultChallengeScheme = "oidc";
-    })
-    .AddCookie("Cookies")
-    .AddOpenIdConnect("oidc", options =>
-    {
-        options.Authority = "https://localhost:5001";
-
-        options.ClientId = "mvc";
-        options.ClientSecret = "secret";
-        options.ResponseType = "code";
-
-        options.SaveTokens = true;
-    });
-```
-
-`AddAuthentication` adds the authentication services to DI.
-
-We are using a cookie to locally sign-in the user (via `"Cookies"` as the `DefaultScheme`),
-and we set the `DefaultChallengeScheme` to `oidc` because when we need the user to login, we will be using the OpenID Connect protocol.
-
-We then use `AddCookie` to add the handler that can process cookies.
-
-Finally, `AddOpenIdConnect` is used to configure the handler that performs the OpenID Connect protocol.
-The `Authority` indicates where the trusted token service is located.
-We then identify this client via the `ClientId` and the `ClientSecret`.
-`SaveTokens` is used to persist the tokens from IdentityServer in the cookie (as they will be needed later).
-
-#### NOTE
-We use the so called `authorization code` flow with PKCE to connect to the OpenID Connect provider. See [here](../topics/grant_types.md#refgranttypes) for more information on protocol flows.
-
-And then to ensure the execution of the authentication services on each request, add `UseAuthentication` to `Configure` in `Startup`:
-
-```csharp
-app.UseStaticFiles();
-
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.UseEndpoints(endpoints =>
+// Demo only. A real server keeps users in a database with hashed passwords, for example with ASP.NET Core Identity.
+public static class Users
 {
-    endpoints.MapDefaultControllerRoute()
-        .RequireAuthorization();
-});
-```
+    private static readonly User[] All =
+    [
+        new("1", "alice", "alice", "Alice Smith", "alice@example.com"),
+        new("2", "bob", "bob", "Bob Jones", "bob@example.com")
+    ];
 
-#### NOTE
-The `RequireAuthorization` method disables anonymous access for the entire application.
-
-You can also use the `[Authorize]` attribute, if you want to specify authorization on a per controller or action method basis.
-
-Also modify the home view to display the claims of the user as well as the cookie properties:
-
-```csharp
-@using Microsoft.AspNetCore.Authentication
-
-<h2>Claims</h2>
-
-<dl>
-    @foreach (var claim in User.Claims)
-    {
-        <dt>@claim.Type</dt>
-        <dd>@claim.Value</dd>
-    }
-</dl>
-
-<h2>Properties</h2>
-
-<dl>
-    @foreach (var prop in (await Context.AuthenticateAsync()).Properties.Items)
-    {
-        <dt>@prop.Key</dt>
-        <dd>@prop.Value</dd>
-    }
-</dl>
-```
-
-If you now navigate to the application using the browser, a redirect attempt will be made
-to IdentityServer - this will result in an error because the MVC client is not registered yet.
-
-## Adding support for OpenID Connect Identity Scopes
-
-Similar to OAuth 2.0, OpenID Connect also uses the scopes concept.
-Again, scopes represent something you want to protect and that clients want to access.
-In contrast to OAuth, scopes in OIDC don’t represent APIs, but identity data like user id,
-name or email address.
-
-Add support for the standard `openid` (subject id) and `profile` (first name, last name etc..) scopes
-by amending the `IdentityResources` property in `Config.cs`:
-
-```csharp
-public static IEnumerable<IdentityResource> IdentityResources =>
-    new List<IdentityResource>
-    {
-        new IdentityResources.OpenId(),
-        new IdentityResources.Profile(),
-    };
-```
-
-Register the identity resources with IdentityServer in `startup.cs`:
-
-```csharp
-var builder = services.AddIdentityServer()
-    .AddInMemoryIdentityResources(Config.IdentityResources)
-    .AddInMemoryApiScopes(Config.ApiScopes)
-    .AddInMemoryClients(Config.Clients);
-```
-
-#### NOTE
-All standard scopes and their corresponding claims can be found in the OpenID Connect [specification](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims)
-
-## Adding Test Users
-
-The sample UI also comes with an in-memory “user database”. You can enable this in IdentityServer by adding the `AddTestUsers` extension method:
-
-```csharp
-var builder = services.AddIdentityServer()
-    .AddInMemoryIdentityResources(Config.IdentityResources)
-    .AddInMemoryApiScopes(Config.ApiScopes)
-    .AddInMemoryClients(Config.Clients)
-    .AddTestUsers(TestUsers.Users);
-```
-
-When you navigate to the `TestUsers` class, you can see that two users called `alice` and `bob` as well as some identity claims are defined.
-You can use those users to login.
-
-## Adding the MVC Client to the IdentityServer Configuration
-
-The last step is to add a new configuration entry for the MVC client to the IdentityServer.
-
-OpenID Connect-based clients are very similar to the OAuth 2.0 clients we added so far.
-But since the flows in OIDC are always interactive, we need to add some redirect URLs to our configuration.
-
-The client list should look like this:
-
-```csharp
-public static IEnumerable<Client> Clients =>
-    new List<Client>
-    {
-        // machine to machine client (from quickstart 1)
-        new Client
-        {
-            ClientId = "client",
-            ClientSecrets = { new Secret("secret".Sha256()) },
-
-            AllowedGrantTypes = GrantTypes.ClientCredentials,
-            // scopes that client has access to
-            AllowedScopes = { "api1" }
-        },
-        // interactive ASP.NET Core MVC client
-        new Client
-        {
-            ClientId = "mvc",
-            ClientSecrets = { new Secret("secret".Sha256()) },
-
-            AllowedGrantTypes = GrantTypes.Code,
-
-            // where to redirect to after login
-            RedirectUris = { "https://localhost:5002/signin-oidc" },
-
-            // where to redirect to after logout
-            PostLogoutRedirectUris = { "https://localhost:5002/signout-callback-oidc" },
-
-            AllowedScopes = new List<string>
-            {
-                IdentityServerConstants.StandardScopes.OpenId,
-                IdentityServerConstants.StandardScopes.Profile
-            }
-        }
-    };
-```
-
-## Testing the client
-
-Now finally everything should be in place for the new MVC client.
-
-Trigger the authentication handshake by navigating to the protected controller action.
-You should see a redirect to the login page of the IdentityServer.
-
-![image](quickstarts/images/3_login.png)
-
-After that, the IdentityServer will redirect back to the MVC client, where the OpenID Connect authentication handler processes the response and signs-in the user locally by setting a cookie.
-Finally the MVC view will show the contents of the cookie.
-
-![image](quickstarts/images/3_claims.png)
-
-As you can see, the cookie has two parts, the claims of the user, and some metadata. This metadata also contains the original token that was issued by the IdentityServer.
-Feel free to copy this token to [jwt.ms](https://jwt.ms) to inspect its content.
-
-## Adding sign-out
-
-The very last step is to add sign-out to the MVC client.
-
-With an authentication service like IdentityServer, it is not enough to clear the local application cookies.
-In addition you also need to make a roundtrip to the IdentityServer to clear the central single sign-on session.
-
-The exact protocol steps are implemented inside the OpenID Connect handler,
-simply add the following code to some controller to trigger the sign-out:
-
-```csharp
-public IActionResult Logout()
-{
-    return SignOut("Cookies", "oidc");
+    public static User? Find(string? userName, string? password)
+        => All.FirstOrDefault(u => u.UserName == userName && u.Password == password);
 }
 ```
 
-This will clear the local cookie and then redirect to the IdentityServer.
-The IdentityServer will clear its cookies and then give the user a link to return back to the MVC application.
+The sample server keeps its users in ASP.NET Core Identity, with hashed passwords and passkeys; see
+[Using ASP.NET Core Identity and passkeys](6_aspnet_identity.md).
 
-## Getting claims from the UserInfo endpoint
+### The login page
 
-You might have noticed that even though we’ve configured the client to be allowed to retrieve the `profile` identity scope, the claims associated with that scope (such as `name`, `family_name`, `website` etc.) don’t appear in the returned token. We need to tell the client to pull remaining claims from the [UserInfo](https://identityserver4.readthedocs.io/en/latest/endpoints/userinfo.html) endpoint by specifying scopes that the client application needs to access and setting the `GetClaimsFromUserInfoEndpoint` option. In the following example we’re requesting the `profile` scope, but it could be any scope (or scopes) that the client is authorized to access:
+Add the login page to `Server/Program.cs`. It is two endpoints: a `GET` that renders the form and a `POST` that checks
+it. The form is protected with an antiforgery token: binding a form with `[FromForm]` turns on antiforgery
+validation, so register the services and the middleware too.
 
 ```csharp
-.AddOpenIdConnect("oidc", options =>
+using System.Net;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
+using MinApiLib.Oidc.Server.Core.Models;
+using MinApiLib.Oidc.Server.Features.Interaction;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOidcServer()
+    .AddInMemoryApiScopes(Config.ApiScopes)
+    .AddInMemoryApiResources(Config.ApiResources)
+    .AddInMemoryClients(Config.Clients)
+    .AddDeveloperSigningCredential();
+
+builder.Services.AddAntiforgery();
+
+var app = builder.Build();
+
+app.UseRouting();
+app.UseOidcServer();
+app.UseAntiforgery();
+
+app.MapOidcServer();
+
+app.MapGet("/account/login", async (string? returnUrl, HttpContext http,
+    IOidcServerInteractionService interaction, IAntiforgery antiforgery) =>
 {
-    // ...
-    options.Scope.Add("profile");
-    options.GetClaimsFromUserInfoEndpoint = true;
-    // ...
+    var context = returnUrl == null ? null : await interaction.GetAuthorizationContextAsync(returnUrl);
+    return LoginPage(http, antiforgery, returnUrl, context, error: null);
+});
+
+app.MapPost("/account/login", async ([FromForm] string? username, [FromForm] string? password,
+    [FromForm] string? returnUrl, HttpContext http,
+    IOidcServerInteractionService interaction, IAntiforgery antiforgery) =>
+{
+    var context = returnUrl == null ? null : await interaction.GetAuthorizationContextAsync(returnUrl);
+    var user = Users.Find(username, password);
+    if (user == null)
+    {
+        return LoginPage(http, antiforgery, returnUrl, context, "Invalid user name or password.");
+    }
+
+    // The server's session: the subject, how the user signed in (amr) and the claims for the tokens.
+    await http.SignInAsync(new OidcServerUser(user.Id)
+    {
+        DisplayName = user.Name,
+        AuthenticationMethods = ["pwd"],
+        AdditionalClaims = { new Claim("email", user.Email) }
+    });
+
+    // Back to the authorize request. Anything else could be an open redirect.
+    return context != null ? Results.Redirect(returnUrl!) : Results.Redirect("/");
+});
+
+app.Run();
+
+static IResult LoginPage(HttpContext http, IAntiforgery antiforgery, string? returnUrl,
+    AuthorizationRequest? context, string? error)
+{
+    var tokens = antiforgery.GetAndStoreTokens(http);
+    var client = context?.Client.ClientName ?? context?.Client.ClientId;
+    return Results.Content($"""
+        <!doctype html>
+        <title>Sign in</title>
+        <h1>Sign in{(client == null ? "" : " to " + WebUtility.HtmlEncode(client))}</h1>
+        <p>{WebUtility.HtmlEncode(error)}</p>
+        <form method="post" action="/account/login">
+          <input type="hidden" name="{tokens.FormFieldName}" value="{tokens.RequestToken}">
+          <input type="hidden" name="returnUrl" value="{WebUtility.HtmlEncode(returnUrl)}">
+          <label>User name <input name="username" autofocus></label>
+          <label>Password <input name="password" type="password"></label>
+          <button>Sign in</button>
+        </form>
+        """, "text/html");
+}
+```
+
+`OidcServerUser` describes the session: `SubjectId` becomes the `sub` claim, `DisplayName` the `name` claim,
+`AuthenticationMethods` the `amr` claim ([RFC 8176](https://www.rfc-editor.org/rfc/rfc8176) values, such as `pwd`),
+and `AdditionalClaims` go into the session cookie as they are. `SignInAsync(OidcServerUser)` is an extension method
+of the server (namespace `Microsoft.AspNetCore.Http`) that signs in to the server's cookie scheme.
+
+The page only redirects to the return URL when it is a valid authorize request (`context != null`). You can also
+check it with `interaction.IsValidReturnUrl(returnUrl)`.
+
+The sample server's [LoginPage.cs](../../samples/Server/Pages/LoginPage.cs) and [Login.cs](../../samples/Server/Login.cs)
+do the same with MinApiLib endpoint records, ASP.NET Core Identity, passkeys and `acr_values`.
+
+### The logout and error pages
+
+The end session endpoint redirects to the logout page with a `logoutId`. The page reads the logout request with
+`GetLogoutContextAsync`, signs the user out of the server, and loads the front-channel logout iframe, which signs the
+user out of the clients of the session. Then it offers the way back to the client:
+
+```csharp
+app.MapGet("/account/logout", async (string? logoutId, HttpContext http, IOidcServerInteractionService interaction) =>
+{
+    var logout = await interaction.GetLogoutContextAsync(logoutId ?? string.Empty);
+    await http.SignOutAsync();
+
+    var back = logout.PostLogoutRedirectUri == null ? "" :
+        $"""<p><a href="{WebUtility.HtmlEncode(logout.PostLogoutRedirectUri)}">Return to {WebUtility.HtmlEncode(logout.ClientName ?? logout.ClientId)}</a></p>""";
+    var iframe = logout.SignOutIFrameUrl == null ? "" :
+        $"""<iframe src="{WebUtility.HtmlEncode(logout.SignOutIFrameUrl)}" hidden></iframe>""";
+    return Results.Content($"<!doctype html><title>Signed out</title><h1>You are signed out</h1>{back}{iframe}", "text/html");
 });
 ```
 
-After restarting the client app, logging out, and logging back in you should see additional user claims associated with the `profile` identity scope displayed on the page.
+This page signs out on a `GET`, like the sample. `logout.ShowSignoutPrompt` is `true` when the request did not come
+with a valid `id_token_hint`, that is, when the server cannot tell that the client sent it: a real logout page should
+then ask the user to confirm. See [Sign-out](../topics/signout.md).
 
-![image](quickstarts/images/3_additional_claims.png)
-
-## Further Experiments
-
-Feel free to add more claims to the test users - and also more identity resources.
-
-The process for defining an identity resource is as follows:
-
-* add a new identity resource to the list - give it a name and specify which claims should be returned when this resource is requested
-* give the client access to the resource via the `AllowedScopes` property on the client configuration
-* request the resource by adding it to the `Scopes` collection on the OpenID Connect handler configuration in the client
-* (optional) if the identity resource is associated with a non-standard claim (e.g. `myclaim1`), on the client side add the [ClaimAction](https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.authentication.openidconnect.openidconnectoptions.claimactions?view=aspnetcore-3.0) mapping between the claim appearing in JSON (returned from the UserInfo endpoint) and the User [Claim](https://docs.microsoft.com/en-us/dotnet/api/system.security.claims.claim)
-  ```csharp
-  using Microsoft.AspNetCore.Authentication
-  // ...
-  .AddOpenIdConnect("oidc", options =>
-  {
-      // ...
-      options.ClaimActions.MapUniqueJsonKey("myclaim1", "myclaim1");
-      // ...
-  });
-  ```
-
-It is also noteworthy, that the retrieval of claims for tokens is an extensibility point - `IProfileService`.
-Since we are using `AddTestUsers`, the `TestUserProfileService` is used by default.
-You can inspect the source code [here](https://github.com/IdentityServer/IdentityServer4/blob/main/src/IdentityServer4/src/Test/TestUserProfileService.cs)
-to see how it works.
-
-<a id="refexternalauthenticationquickstart"></a>
-
-## Adding Support for External Authentication
-
-Next we will add support for external authentication.
-This is really easy, because all you really need is an ASP.NET Core compatible authentication handler.
-
-ASP.NET Core itself ships with support for Google, Facebook, Twitter, Microsoft Account and OpenID Connect.
-In addition you can find implementations for many other authentication providers [here](https://github.com/aspnet-contrib/AspNet.Security.OAuth.Providers).
-
-## Adding Google support
-
-To be able to use Google for authentication, you first need to register with them.
-This is done at their developer [console](https://console.developers.google.com/).
-Create a new project, enable the Google+ API and configure the callback address of your
-local IdentityServer by adding the  */signin-google* path to your base-address (e.g. [https://localhost:5001/signin-google](https://localhost:5001/signin-google)).
-
-The developer console will show you a client ID and secret issued by Google - you will need that in the next step.
-
-Add the Google authentication handler to the DI of the IdentityServer host.
-This is done by first adding the `Microsoft.AspNetCore.Authentication.Google` nuget package and then adding this snippet to `ConfigureServices` in `Startup`:
+The error page shows the errors the server cannot send back to the client, such as an unknown redirect URI:
 
 ```csharp
-services.AddAuthentication()
-    .AddGoogle("Google", options =>
-    {
-        options.SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme;
-
-        options.ClientId = "<insert here>";
-        options.ClientSecret = "<insert here>";
-    });
+app.MapGet("/home/error", async (string? errorId, IOidcServerInteractionService interaction) =>
+{
+    var error = errorId == null ? null : await interaction.GetErrorContextAsync(errorId);
+    return Results.Content($"""
+        <!doctype html><title>Error</title><h1>Error</h1>
+        <p>{WebUtility.HtmlEncode(error?.Error)}: {WebUtility.HtmlEncode(error?.ErrorDescription)}</p>
+        """, "text/html");
+});
 ```
 
-By default, IdentityServer configures a cookie handler specifically for the results of external authentication (with the scheme based on the constant `IdentityServerConstants.ExternalCookieAuthenticationScheme`).
-The configuration for the Google handler is then using that cookie handler.
+## Adding support for OpenID Connect identity scopes
 
-Now run the MVC client and try to authenticate - you will see a Google button on the login page:
+Like OAuth 2.0, OpenID Connect uses scopes. Here they do not represent APIs but identity data: the user id
+(`openid`), the profile (`profile`: name, ...) and the email address (`email`). Add them to `Config`:
 
-![image](quickstarts/images/4_login_page.png)
+```csharp
+public static IEnumerable<IdentityResource> IdentityResources =>
+[
+    new IdentityResources.OpenId(),
+    new IdentityResources.Profile(),
+    new IdentityResources.Email()
+];
+```
 
-After authentication with the MVC client, you can see that the claims are now being sourced from Google data.
+and register them:
 
-#### NOTE
-If you are interested in the magic that automatically renders the Google button on the login page, inspect the `BuildLoginViewModel` method on the `AccountController`.
+```csharp
+builder.Services.AddOidcServer()
+    .AddInMemoryIdentityResources(Config.IdentityResources)
+    .AddInMemoryApiScopes(Config.ApiScopes)
+    .AddInMemoryApiResources(Config.ApiResources)
+    .AddInMemoryClients(Config.Clients)
+    .AddDeveloperSigningCredential();
+```
+
+The OpenID Connect [specification](https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims) lists the
+standard scopes and their claims.
+
+## Adding the web client to the server configuration
+
+An interactive client is like the client of quickstart 1, but it uses the authorization code flow, so it needs the
+addresses the server may redirect to. Add it to `Config.Clients`:
+
+```csharp
+new Client
+{
+    ClientId = "web",
+    ClientSecrets = { new Secret("web-secret".Sha256()) },
+
+    // authorization code flow with PKCE
+    AllowedGrantTypes = GrantTypes.Code,
+    RequirePkce = true,
+
+    // this quickstart has no consent page
+    RequireConsent = false,
+
+    // put the profile claims in the identity token, so the client does not call the userinfo endpoint
+    AlwaysIncludeUserClaimsInIdToken = true,
+
+    // where to redirect after login, after logout, and the front-channel logout page of the client
+    RedirectUris = { "https://localhost:5002/signin-oidc" },
+    PostLogoutRedirectUris = { "https://localhost:5002/signout-callback-oidc" },
+    FrontChannelLogoutUri = "https://localhost:5002/signout-oidc",
+
+    AllowedScopes = { "openid", "profile", "email" }
+}
+```
+
+The paths are the defaults of the ASP.NET Core OpenID Connect handler.
+
+## Creating the web client
+
+Create the web application:
+
+```bash
+dotnet new web -n WebClient
+dotnet sln add WebClient
+dotnet add WebClient package MinApiLib.Oidc.Authentication --prerelease
+```
+
+`MinApiLib.Oidc.Authentication` brings the ASP.NET Core OpenID Connect handler
+(`Microsoft.AspNetCore.Authentication.OpenIdConnect`) in the version that matches your framework. You use the
+package's own features in the [next quickstart](3_aspnetcore_and_apis.md).
+
+Set its address to `https://localhost:5002` in `WebClient/Properties/launchSettings.json`, and replace
+`WebClient/Program.cs`:
+
+```csharp
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = "cookie";
+        options.DefaultChallengeScheme = "oidc";
+    })
+    .AddCookie("cookie")
+    .AddOpenIdConnect("oidc", options =>
+    {
+        options.Authority = "https://localhost:5001";
+        options.ClientId = "web";
+        options.ClientSecret = "web-secret";
+        options.ResponseType = "code";
+        options.UsePkce = true;
+
+        // "openid" and "profile" are in the list by default
+        options.Scope.Add("email");
+
+        options.SaveTokens = true;
+        options.GetClaimsFromUserInfoEndpoint = false;
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.NameClaimType = "name";
+    });
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapGet("/", (ClaimsPrincipal user) => new
+{
+    name = user.Identity!.Name,
+    claims = user.Claims.Select(c => new { c.Type, c.Value })
+}).RequireAuthorization();
+
+app.MapGet("/logout", () => Results.SignOut(
+    new AuthenticationProperties { RedirectUri = "/signed-out" }, ["cookie", "oidc"]));
+
+app.MapGet("/signed-out", () => "Signed out.");
+
+app.Run();
+```
+
+* `AddAuthentication` sets the cookie as the default scheme: the application keeps its own session in a cookie. The
+  challenge scheme is `oidc`: when a user must sign in, the OpenID Connect handler sends them to the server.
+* `AddOpenIdConnect` configures the handler: where the server is (`Authority`), the client id and secret, and the
+  authorization code flow (`ResponseType = "code"`) with PKCE. `SaveTokens` keeps the tokens in the cookie, for the
+  next quickstart.
+* `MapInboundClaims = false` keeps the claim names of the token (`sub`, `name`, `email`) instead of mapping them to
+  long URIs.
+* `RequireAuthorization()` on `/` makes anonymous users sign in.
+
+See [Grant Types](../topics/grant_types.md) for the protocol flows.
+
+## Testing the client
+
+Run the server and the web client, and open `https://localhost:5002`. The page requires a signed-in user, so the
+OpenID Connect handler sends you to the server.
+
+The ASP.NET Core OpenID Connect handler pushes the authorize request to the server's
+[pushed authorization endpoint](../topics/par.md) first, because the discovery document announces it, and sends the
+browser to the authorize endpoint with a reference to it:
+
+```http
+GET /connect/authorize?client_id=web&request_uri=urn%3Aietf%3Aparams%3Aoauth%3Arequest_uri%3A74A0BB1E140F61ED... HTTP/1.1
+Host: localhost:5001
+```
+
+The server redirects to your login page, with the authorize request in `ReturnUrl`:
+
+```http
+HTTP/1.1 302 Found
+Location: https://localhost:5001/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb%26request_uri%3D...
+```
+
+Sign in as `alice` / `alice`. The login page redirects back to the authorize request, and the server posts the
+authorization code to the client (`response_mode=form_post`, the handler's default). The handler redeems the code at
+the token endpoint with its secret and the PKCE `code_verifier`, validates the identity token and signs the user in to
+the application's cookie. The page shows the user's claims:
+
+```json
+{
+  "name": "Alice Smith",
+  "claims": [
+    { "type": "sid", "value": "AB971B8965E0F136AED664FEA98E15EB" },
+    { "type": "sub", "value": "1" },
+    { "type": "auth_time", "value": "1794912843" },
+    { "type": "idp", "value": "local" },
+    { "type": "name", "value": "Alice Smith" },
+    { "type": "email", "value": "alice@example.com" },
+    { "type": "amr", "value": "pwd" },
+    ...
+  ]
+}
+```
+
+`name` and `email` come from the session the login page created: the server's default profile service
+(`DefaultProfileService`) issues the claims of the session that the requested scopes ask for. A real server
+implements `IProfileService` over its user store and registers it with `AddProfileService<T>()`; see
+[Profile Service](../reference/profileservice.md).
+
+The claims are in the identity token because the client has `AlwaysIncludeUserClaimsInIdToken`. Without it, set
+`GetClaimsFromUserInfoEndpoint = true` in the handler, which then gets them from the userinfo endpoint.
+
+## Adding sign-out
+
+Signing out of the application is not enough: the user still has a session on the server, and would be signed in
+again without seeing the login page. `/logout` signs out of both schemes: the cookie, and `oidc`, which sends the user
+to the server's end session endpoint with the identity token as `id_token_hint`.
+
+The server redirects to your logout page, which ends the server session, loads the front-channel logout iframe
+(which calls the `FrontChannelLogoutUri` of the clients of the session), and links back to
+`https://localhost:5002/signout-callback-oidc`. The handler then redirects to `/signed-out`.
 
 ## Further experiments
 
-You can add an additional external provider.
-We have a [cloud-hosted demo](https://demo.identityserver.io) version of IdentityServer4 which you can integrate using OpenID Connect.
+Add more claims to the users and more identity resources:
 
-Add the OpenId Connect handler to DI:
+* add an identity resource to `Config.IdentityResources`, with a name and the claims it carries;
+* allow it in the client's `AllowedScopes`;
+* ask for it with `options.Scope.Add(...)` in the web client;
+* put the claims in the session, in `AdditionalClaims`, or return them from your `IProfileService`.
+
+Try the error paths too: a wrong password, a redirect URI that is not registered (the server shows your error page),
+or a scope the client is not allowed to ask for.
+
+<a id="refexternalauthenticationquickstart"></a>
+
+## Adding support for external authentication
+
+The login page can also offer external identity providers, such as Google, Microsoft or another OpenID Connect
+server. All you need is an ASP.NET Core authentication handler for the provider; ASP.NET Core has handlers for
+Google, Facebook, Twitter, Microsoft accounts and OpenID Connect, and
+[AspNet.Security.OAuth.Providers](https://github.com/aspnet-contrib/AspNet.Security.OAuth.Providers) has many more.
+
+The server registers a cookie scheme for the result of an external sign-in,
+`OidcServerConstants.ExternalCookieAuthenticationScheme` (`idsrv.external`). Register the provider's handler with
+that scheme as its sign-in scheme. For example, with the `Microsoft.AspNetCore.Authentication.Google` package (in the
+version of your framework) and a client id and secret from the Google developer console, with
+`https://localhost:5001/signin-google` as the callback address:
 
 ```csharp
-services.AddAuthentication()
+builder.Services.AddAuthentication()
     .AddGoogle("Google", options =>
     {
-        options.SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme;
-
-        options.ClientId = "<insert here>";
-        options.ClientSecret = "<insert here>";
-    })
-    .AddOpenIdConnect("oidc", "Demo IdentityServer", options =>
-    {
-        options.SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme;
-        options.SignOutScheme = IdentityServerConstants.SignoutScheme;
-        options.SaveTokens = true;
-
-        options.Authority = "https://demo.identityserver.io/";
-        options.ClientId = "interactive.confidential";
-        options.ClientSecret = "secret";
-        options.ResponseType = "code";
-
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            NameClaimType = "name",
-            RoleClaimType = "role"
-        };
+        options.SignInScheme = OidcServerConstants.ExternalCookieAuthenticationScheme;
+        options.ClientId = "<client id>";
+        options.ClientSecret = "<client secret>";
     });
 ```
 
-And now a user should be able to use the cloud-hosted demo identity provider.
+Then add a link on the login page, `/account/external?scheme=Google&returnUrl=...`, and two endpoints: one that
+starts the external sign-in, and one that receives its result, signs the user in to the server and cleans up the
+external cookie:
 
-#### NOTE
-The quickstart UI auto-provisions external users. As an external user logs in for the first time, a new local user is created, and all the external claims are copied over and associated with the new user. The way you deal with such a situation is completely up to you though. Maybe you want to show some sort of registration UI first. The source code for the default quickstart can be found [here](https://github.com/IdentityServer/IdentityServer4.Quickstart.UI). The controller where auto-provisioning is executed can be found [here](https://github.com/IdentityServer/IdentityServer4.Quickstart.UI/blob/main/Quickstart/Account/ExternalController.cs).
+```csharp
+app.MapGet("/account/external", (string scheme, string? returnUrl) =>
+    Results.Challenge(new AuthenticationProperties
+    {
+        RedirectUri = "/account/external/callback",
+        Items = { ["scheme"] = scheme, ["returnUrl"] = returnUrl }
+    }, [scheme]));
+
+app.MapGet("/account/external/callback", async (HttpContext http, IOidcServerInteractionService interaction) =>
+{
+    var result = await http.AuthenticateAsync(OidcServerConstants.ExternalCookieAuthenticationScheme);
+    if (!result.Succeeded)
+    {
+        return Results.Redirect("/account/login");
+    }
+
+    var provider = result.Properties.Items["scheme"]!;
+    var externalId = result.Principal.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+    // Find the local user of (provider, externalId), or create one. The sketch uses the external id as is.
+    await http.SignInAsync(new OidcServerUser($"{provider}:{externalId}")
+    {
+        DisplayName = result.Principal.FindFirstValue(ClaimTypes.Name),
+        IdentityProvider = provider
+    });
+    await http.SignOutAsync(OidcServerConstants.ExternalCookieAuthenticationScheme);
+
+    var returnUrl = result.Properties.Items["returnUrl"];
+    var context = returnUrl == null ? null : await interaction.GetAuthorizationContextAsync(returnUrl);
+    return Results.Redirect(context != null ? returnUrl! : "/");
+});
+```
+
+`OidcServerConstants` is in the `MinApiLib.Oidc.Server` namespace. What to do with a user who signs in for the first
+time is up to you: create a local account, link it to an existing one, or show a registration page first. See
+[Sign-in with External Identity Providers](../topics/signin_external_providers.md).
 
 [[go back to index]](../index.md#documentation-structure)

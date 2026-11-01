@@ -2,82 +2,137 @@
 
 # Sign-in
 
-In order for IdentityServer to issue tokens on behalf of a user, that user must sign-in to IdentityServer.
+The server issues tokens for a user only after that user has signed in to the server. The server has no login page
+and no user database: the host writes the login page and checks the user's credentials against its own user store.
+[samples/Server](../../samples/Server) has a minimal login page with passwords and passkeys.
 
 ## Cookie authentication
 
-Authentication is tracked with a cookie managed by the [cookie authentication](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/cookie) handler from ASP.NET Core.
+The session at the server is a cookie of the ASP.NET Core
+[cookie authentication](https://learn.microsoft.com/aspnet/core/security/authentication/cookie) handler.
 
-IdentityServer registers two cookie handlers (one for the authentication session and one for temporary external cookies). These are used by default and you can get their
-names from the `IdentityServerConstants` class (`DefaultCookieAuthenticationScheme` and `ExternalCookieAuthenticationScheme`) if you want to reference them manually.
+`AddOidcServer()` registers two cookie handlers and makes the first one the default scheme:
 
-Only the basic settings are exposed for these cookies (expiration and sliding), but you can register your own cookie handlers if you need more control.
-IdentityServer uses whichever cookie handler matches the `DefaultAuthenticateScheme` as configured on the `AuthenticationOptions` when using `AddAuthentication` from ASP.NET Core.
+| Scheme (`OidcServerConstants`) | Cookie | Use |
+|---|---|---|
+| `DefaultCookieAuthenticationScheme` | `idsrv` | The user's session at the server |
+| `ExternalCookieAuthenticationScheme` | `idsrv.external` | The temporary result of an [external sign-in](signin_external_providers.md) |
+
+`OidcServerOptions.Authentication` sets the session cookie's lifetime (`CookieLifetime`, ten hours by default),
+sliding expiration (`CookieSlidingExpiration`) and `SameSite` mode (`CookieSameSiteMode`, `None` by default, which
+the front-channel logout iframes and `prompt=none` requests from other sites need).
 
 #### NOTE
-In addition to the authentication cookie, IdentityServer will issue an additional cookie which defaults to the name “idsrv.session”. This cookie is derived from the main authentication cookie, and it used for the check session endpoint for [browser-based JavaScript clients at signout time](signout.md#refsignout). It is kept in sync with the authentication cookie, and is removed when the user signs out.
+The server also writes a second cookie, `idsrv.session` (`Authentication.CheckSessionCookieName`). It holds the
+session id for the check session endpoint, which [browser-based clients](signout.md) use to notice that the user
+signed out. It follows the session cookie and is removed when the user signs out.
 
-## Overriding cookie handler configuration
+### Using your own cookie handler
 
-If you wish to use your own cookie authentication handler, then you must configure it yourself.
-This must be done in `ConfigureServices` after registering IdentityServer in DI (with `AddIdentityServer`).
-For example:
+To configure the cookie handler yourself, register it after `AddOidcServer()` and make it the default scheme, or
+name it in `Authentication.CookieAuthenticationScheme`:
 
 ```csharp
-services.AddIdentityServer()
-    .AddInMemoryClients(Clients.Get())
-    .AddInMemoryIdentityResources(Resources.GetIdentityResources())
-    .AddInMemoryApiResources(Resources.GetApiResources())
-    .AddDeveloperSigningCredential()
-    .AddTestUsers(TestUsers.Users);
+builder.Services.AddOidcServer(options => options.Authentication.CookieAuthenticationScheme = "login")
+    .AddInMemoryClients(Config.Clients)
+    .AddInMemoryIdentityResources(Config.IdentityResources)
+    .AddInMemoryApiScopes(Config.ApiScopes);
 
-services.AddAuthentication("MyCookie")
-    .AddCookie("MyCookie", options =>
-    {
-        options.ExpireTimeSpan = ...;
-    });
+builder.Services.AddAuthentication("login")
+    .AddCookie("login", options => options.ExpireTimeSpan = TimeSpan.FromHours(1));
 ```
 
+The server uses `CookieAuthenticationScheme` when it is set, and the default authenticate scheme otherwise.
+
+## Login workflow
+
+When a request reaches the authorize endpoint and the user has no session (or the client asked for a new sign-in
+with `prompt=login`, `max_age` or, with `EnforceAcrValues`, `acr_values`), the server redirects the browser to the
+login page. The page receives the authorize request as a return URL:
+
+```http
+HTTP/1.1 302 Found
+Location: https://localhost:5001/account/login?returnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb%26...
+```
+
+Two options of `OidcServerOptions.UserInteraction` set the URL:
+
+| Option | Default |
+|---|---|
+| `LoginUrl` | The `LoginPath` of the session cookie handler: `/Account/Login` in ASP.NET Core |
+| `LoginReturnUrlParameter` | The `ReturnUrlParameter` of the session cookie handler: `ReturnUrl` in ASP.NET Core |
+
+ASP.NET Core matches paths and query parameter names without regard to case, so the sample's `/account/login`
+page with a `returnUrl` parameter works with the defaults. To use another page, set the option:
+
+```csharp
+builder.Services.AddOidcServer(options => options.UserInteraction.LoginUrl = "/signin");
+```
+
+`LoginUrl` can be an absolute URL on another host; the return URL is then absolute too.
+
+![image](images/signin_flow.png)
+
 #### NOTE
-IdentityServer internally calls both `AddAuthentication` and `AddCookie` with a custom scheme (via the constant `IdentityServerConstants.DefaultCookieAuthenticationScheme`), so to override them you must make the same calls after `AddIdentityServer`.
+Beware of [open redirects](https://en.wikipedia.org/wiki/URL_redirection#Security_issues) through the return URL.
+Redirect only to a return URL the server recognises (see below) or to a local path of your own.
 
-## Login User Interface and Identity Management System
+## Login context
 
-IdentityServer does not provide any user-interface or user database for user authentication.
-These are things you are expected to provide or develop yourself.
+`IOidcServerInteractionService.GetAuthorizationContextAsync(returnUrl)` reads the authorize request from the return
+URL. It returns an `AuthorizationRequest` with the client, `prompt`, `login_hint`, `acr_values`, the `idp:` hint, the
+requested resources and the raw parameters, so the page can adapt: show the client's name, preselect the user name,
+offer only some providers, or ask for a stronger sign-in. It returns `null` when the return URL is not a valid
+authorize request, and the page should then not redirect to it. `IsValidReturnUrl(returnUrl)` gives the same answer
+without the context. See the [interaction service](../reference/interactionservice.md).
 
-If you need a starting point for a basic UI (login, logout, consent and manage grants),
-you can use our [quickstart UI](https://github.com/IdentityServer/IdentityServer4.Quickstart.UI).
+```csharp
+var context = await interaction.GetAuthorizationContextAsync(returnUrl);
+if (context?.AcrValues.Contains("phr") == true)
+{
+    // the client asked for a phishing-resistant sign-in: offer only passkeys
+}
+```
 
-The quickstart UI authenticates users against an in-memory database. You would replace those bits with access to your real user store.
-We have samples that use [ASP.NET Identity](../quickstarts/6_aspnet_identity.md#refaspnetidentityquickstart).
+## Signing the user in
 
-## Login Workflow
+Once the credentials are checked, the page signs the user in with the session cookie scheme and redirects to the
+return URL. The server's `SignInAsync(OidcServerUser)` extension method on `HttpContext` builds the principal and
+uses the right scheme:
 
-When IdentityServer receives a request at the authorization endpoint and the user is not authenticated, the user will be redirected to the configured login page.
-You must inform IdentityServer of the path to your login page via the `UserInteraction` settings on the [options](../reference/options.md#refoptions) (the default is `/account/login`).
-A `returnUrl` parameter will be passed informing your login page where the user should be redirected once login is complete.
+```csharp
+await http.SignInAsync(new OidcServerUser(user.Id)
+{
+    DisplayName = user.Name,
+    AuthenticationMethods = ["pwd"],
+    AdditionalClaims = { new Claim("email", user.Email) }
+});
 
-![image](topics/images/signin_flow.png)
+return context != null ? Results.Redirect(returnUrl) : Results.Redirect("/");
+```
 
-#### NOTE
-Beware [open-redirect attacks](https://en.wikipedia.org/wiki/URL_redirection#Security_issues) via the `returnUrl` parameter. You should validate that the `returnUrl` refers to well-known location. See the [interaction service](../reference/interactionservice.md#refinteractionservice) for APIs to validate the `returnUrl` parameter.
+`OidcServerUser` (namespace `MinApiLib.Oidc.Server.Core.Models`) turns its properties into these claims:
 
-## Login Context
+| Property | Claim | Required | Default when missing |
+|---|---|---|---|
+| `SubjectId` (constructor) | `sub` | Yes | |
+| `DisplayName` | `name` | No | |
+| `IdentityProvider` | `idp` | No | `local` |
+| `AuthenticationMethods` | `amr` (one per value) | No | `pwd` for local users, `external` otherwise |
+| `AuthenticationTime` | `auth_time` | No | The time of the sign-in |
+| `AdditionalClaims` | as given | No | |
 
-On your login page you might require information about the context of the request in order to customize the login experience
-(such as client, prompt parameter, IdP hint, or something else).
-This is made available via the `GetAuthorizationContextAsync` API on the [interaction service](../reference/interactionservice.md#refinteractionservice).
+The server checks that the principal has a single identity and a `sub` claim, adds the missing claims above when the
+user signs in with the session scheme, and starts a new session id. Calling `HttpContext.SignInAsync` with your own
+`ClaimsPrincipal` works the same way.
 
-## Issuing a cookie and Claims
+An `acr` claim in the session goes into the tokens as is. Set it when the login page knows the assurance level of the
+sign-in (the sample sets `phr` for passkeys); with `OidcServerOptions.Authentication.EnforceAcrValues` the authorize
+endpoint compares it with the client's `acr_values` (see the
+[ASP.NET Core Identity quickstart](../quickstarts/6_aspnet_identity.md)).
 
-There are authentication-related extension methods on the `HttpContext` from ASP.NET Core to issue the authentication cookie and sign a user in.
-The authentication scheme used must match the cookie handler you are using (see above).
-
-When you sign the user in you must issue at least a `sub` claim and a `name` claim.
-IdentityServer also provides a few `SignInAsync` extension methods on the `HttpContext` to make this more convenient.
-
-You can also optionally issue an `idp` claim (for the identity provider name), an `amr` claim (for the authentication method used), and/or an `auth_time` claim (for the epoch time a user authenticated).
-If you do not provide these, then IdentityServer will provide default values.
+The claims in the cookie describe the session. The claims in the tokens come from the
+[profile service](../reference/profileservice.md): the default one copies the requested claims from the cookie,
+and your own can read them from the user store instead.
 
 [[go back to index]](../index.md#documentation-structure)

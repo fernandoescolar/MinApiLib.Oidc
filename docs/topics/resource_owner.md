@@ -24,9 +24,10 @@ new Client
 A client that lists the grant without the flag fails configuration validation. The grant is not published in the
 discovery document, and the `password` parameter is removed from the logs.
 
-To use the grant you also need to implement and register the `IResourceOwnerPasswordValidator` interface with
-`AddResourceOwnerValidator<T>()`. `AddAspNetIdentity<TUser>()` registers one for ASP.NET Core Identity, which counts
-failed attempts towards lockout. Without a validator the token endpoint answers `unsupported_grant_type`.
+To use the grant you also need to implement the `IResourceOwnerPasswordValidator` interface (namespace
+`MinApiLib.Oidc.Server.Features.Tokens.Grants`) over your user store and register it with
+`AddResourceOwnerValidator<T>()`. Without one, the default `NotSupportedResourceOwnerPasswordValidator` makes the
+token endpoint answer `unsupported_grant_type`.
 
 ```csharp
 public interface IResourceOwnerPasswordValidator
@@ -39,8 +40,36 @@ public interface IResourceOwnerPasswordValidator
 }
 ```
 
-On the context you will find already parsed protocol parameters like `UserName` and `Password`, but also the raw request if you want to look at other input data.
+On the context you will find the already parsed `UserName` and `Password`, and the validated request (`Request`,
+with the raw parameters in `Request.Raw`) if you want to look at other input data.
 
-Your job is then to implement the password validation and set the `Result` on the context accordingly. See the [GrantValidationResult](../reference/grant_validation_result.md#refgrantvalidationresult) documentation.
+Your job is then to validate the password and set the `Result` on the context. See the
+[GrantValidationResult](../reference/grant_validation_result.md) documentation. For example, over ASP.NET Core
+Identity, counting failed attempts towards lockout:
+
+```csharp
+public class IdentityPasswordValidator(UserManager<AppUser> users) : IResourceOwnerPasswordValidator
+{
+    public async Task ValidateAsync(ResourceOwnerPasswordValidationContext context)
+    {
+        var user = await users.FindByNameAsync(context.UserName);
+        if (user is null || await users.IsLockedOutAsync(user))
+        {
+            return; // the default Result is invalid_grant
+        }
+
+        if (!await users.CheckPasswordAsync(user, context.Password))
+        {
+            await users.AccessFailedAsync(user);
+            return;
+        }
+
+        await users.ResetAccessFailedCountAsync(user);
+        context.Result = new GrantValidationResult(user.Id, OidcConstants.AuthenticationMethods.Password);
+    }
+}
+```
+
+The server raises a `UserLoginSuccessEvent` or `UserLoginFailureEvent` for each request (see [Events](events.md#refevents)).
 
 [[go back to index]](../index.md#documentation-structure)

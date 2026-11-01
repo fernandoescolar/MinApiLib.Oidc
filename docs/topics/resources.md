@@ -1,16 +1,22 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refresources"></a>
+
 # Defining Resources
 
 The ultimate job of an OpenID Connect/OAuth token service is to control access to resources.
 
-The two fundamental resource types in IdentityServer are:
+The server has two fundamental resource types:
 
-* **identity resources:** represent claims about a user like user ID, display name, email address etc…
-* **API resources:** represent functionality a client wants to access. Typically, they are HTTP-based endpoints (aka APIs), but could be also message queuing endpoints or similar.
+* **identity resources:** claims about a user, like the user ID, display name or email address.
+* **APIs:** functionality a client wants to access, modelled as API scopes and, optionally, API resources. Typically
+  they are HTTP APIs, but they could also be message queues or similar.
 
 #### NOTE
-You can define resources using a C# object model - or load them from a data store. An implementation of `IResourceStore` deals with these low-level details. For this document we are using the in-memory implementation.
+You can define resources with the C# object model, or load them from a data store. An implementation of
+`IResourceStore` deals with these details. This page uses the in-memory store (`AddInMemoryIdentityResources`,
+`AddInMemoryApiScopes`, `AddInMemoryApiResources`); `MinApiLib.Oidc.Server.MongoDB` keeps them in MongoDB (see
+[Startup](startup.md#refstartup)). The types live in `MinApiLib.Oidc.Server.Core.Models`.
 
 ## Identity Resources
 
@@ -49,7 +55,7 @@ public static IEnumerable<IdentityResource> GetIdentityResources()
 ```
 
 #### NOTE
-see the reference section for more information on `IdentityResource`.
+See the [IdentityResource reference](../reference/identity_resource.md) for more information on `IdentityResource`.
 
 The following example shows a custom identity resource called *profile* that represents the display name, email address and website claim:
 
@@ -79,18 +85,19 @@ var client = new Client
 
 The client can then request the resource using the scope parameter (other parameters omitted):
 
-```csharp
-https://demo.identityserver.io/connect/authorize?client_id=client&scope=openid profile
+```http
+GET /connect/authorize?client_id=client&scope=openid%20profile&... HTTP/1.1
+Host: login.example.com
 ```
 
-IdentityServer will then use the scope names to create a list of requested claim types,
-and present that to your implementation of the [profile service](../reference/profileservice.md#refprofileservice).
+The server then turns the scope names into a list of requested claim types and passes it to your implementation of
+the [profile service](../reference/profileservice.md).
 
 <a id="refapiresources"></a>
 
 ## APIs
 
-Designing your API surface can be a complicated task. IdentityServer provides a couple of primitives to help you with that.
+Designing your API surface can be a complicated task. The server provides a couple of primitives to help you with that.
 
 The original OAuth 2.0 specification has the concept of scopes, which is just defined as *the scope of access* that the client requests.
 Technically speaking, the *scope* parameter is a list of space delimited values - you need to provide the structure and semantics of it.
@@ -141,7 +148,7 @@ var mobileApp = new Client
 When a client asks for a scope (and that scope is allowed via configuration and not denied via consent),
 the value of that scope will be included in the resulting access token as a claim of type *scope* (for both JWTs and introspection), e.g.:
 
-```csharp
+```json
 {
     "typ": "at+jwt"
 }.
@@ -149,8 +156,18 @@ the value of that scope will be included in the resulting access token as a clai
     "client_id": "mobile_app",
     "sub": "123",
 
-    "scope": "read write delete"
+    "scope": [ "read", "write", "delete" ]
 }
+```
+
+In JWTs the scopes are a JSON array. Set `OidcServerOptions.EmitScopesAsSpaceDelimitedStringInJwt` to emit them as a
+space-delimited string instead. The introspection endpoint always returns a space-delimited string.
+
+An ASP.NET Core API checks the scope with an authorization policy (see [Protecting APIs](apis.md#refprotectingapis)):
+
+```csharp
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("write", policy => policy.RequireClaim("scope", "write"));
 ```
 
 The consumer of the access token can use that data to make sure that the client is actually allowed to invoke the corresponding functionality.
@@ -172,7 +189,9 @@ This will pass the *user_level* claim as a requested claim type to the profile s
 so that the consumer of the access token can use this data as input for authorization decisions or business logic.
 
 #### NOTE
-When using the scope-only model, no aud (audience) claim will be added to the token, since this concept does not apply. If you need an aud claim, you can enable the `EmitStaticAudience` setting on the options. This will emit an aud claim in the `issuer_name/resources` format. If you need more control of the aud claim, use API resources.
+When the granted scopes belong to no API resource, the access token gets the static audience `{issuer}/resources`,
+because JWT access tokens must have an `aud` claim (RFC 9068). `OidcServerOptions.EmitStaticAudienceClaim` adds it
+to every access token, next to the API resource names. If you need more control of the `aud` claim, use API resources.
 
 ### Parameterized Scopes
 
@@ -229,16 +248,26 @@ You then have access to the parsed value throughout the pipeline, e.g. in the pr
 ```csharp
 public class HostProfileService : IProfileService
 {
-    public override async Task GetProfileDataAsync(ProfileDataRequestContext context)
+    public Task GetProfileDataAsync(ProfileDataRequestContext context)
     {
-        var transaction = context.RequestedResources.ParsedScopes.FirstOrDefault(x => x.ParsedName == "transaction");
+        var transaction = context.RequestedResources?.ParsedScopes.FirstOrDefault(x => x.ParsedName == "transaction");
         if (transaction?.ParsedParameter != null)
         {
             context.IssuedClaims.Add(new Claim("transaction_id", transaction.ParsedParameter));
         }
+
+        return Task.CompletedTask;
+    }
+
+    public Task IsActiveAsync(IsActiveContext context)
+    {
+        context.IsActive = true;
+        return Task.CompletedTask;
     }
 }
 ```
+
+Register the parser with `AddScopeParser<ParameterizedScopeParser>()` on the builder.
 
 ### API Resources
 
@@ -248,7 +277,7 @@ You typically need to introduce some sort of namespacing to organize the scope n
 get some higher-level constructs like an *audience* claim in access tokens.
 You might also have scenarios, where multiple resources should support the same scope names, whereas sometime you explicitly want to isolate a scope to a certain resource.
 
-In IdentityServer, the `ApiResource` class allows some additional organization. Let’s use the following scope definition:
+The `ApiResource` class allows some additional organization. Let’s use the following scope definition:
 
 ```csharp
 public static IEnumerable<ApiScope> GetApiScopes()
@@ -272,7 +301,7 @@ public static IEnumerable<ApiScope> GetApiScopes()
 With `ApiResource` you can now create two logical APIs and their corresponding scopes:
 
 ```csharp
-public static readonly IEnumerable<ApiResource> GetApiResources()
+public static IEnumerable<ApiResource> GetApiResources()
 {
     return new List<ApiResource>
     {
@@ -292,15 +321,16 @@ public static readonly IEnumerable<ApiResource> GetApiResources()
 Using the API resource grouping gives you the following additional features
 
 * support for the JWT *aud* claim. The value(s) of the audience claim will be the name of the API resource(s)
-* support for adding common user claims across all contained scopes
-* support for introspection by assigning an API secret to the resource
-* support for configuring the access token signing algorithm for the resource
+* support for adding common user claims across all contained scopes (`UserClaims`)
+* support for introspection by assigning an API secret to the resource (`ApiSecrets`)
+* support for configuring the access token signing algorithm for the resource (`AllowedAccessTokenSigningAlgorithms`)
+* support for resource indicators (see below)
 
 Let’s have a look at some example access tokens for the above resource configuration.
 
 **Client requests** invoice.read and invoice.pay:
 
-```csharp
+```json
 {
     "typ": "at+jwt"
 }.
@@ -309,13 +339,13 @@ Let’s have a look at some example access tokens for the above resource configu
     "sub": "123",
 
     "aud": "invoice",
-    "scope": "invoice.read invoice.pay"
+    "scope": [ "invoice.read", "invoice.pay" ]
 }
 ```
 
 **Client requests** invoice.read and customer.read:
 
-```csharp
+```json
 {
     "typ": "at+jwt"
 }.
@@ -323,14 +353,14 @@ Let’s have a look at some example access tokens for the above resource configu
     "client_id": "client",
     "sub": "123",
 
-    "aud": [ "invoice", "customer" ]
-    "scope": "invoice.read customer.read"
+    "aud": [ "invoice", "customer" ],
+    "scope": [ "invoice.read", "customer.read" ]
 }
 ```
 
 **Client requests** manage:
 
-```csharp
+```json
 {
     "typ": "at+jwt"
 }.
@@ -338,8 +368,8 @@ Let’s have a look at some example access tokens for the above resource configu
     "client_id": "client",
     "sub": "123",
 
-    "aud": [ "invoice", "customer" ]
-    "scope": "manage"
+    "aud": [ "invoice", "customer" ],
+    "scope": [ "manage" ]
 }
 ```
 
@@ -360,14 +390,5 @@ rejected with `invalid_target`.
 
 Set `ApiResource.RequireResourceIndicator` for APIs that must only appear in the audience when asked for explicitly.
 Without a `resource` parameter, such an API is left out of the `aud` claim even if one of its scopes is granted.
-
-### Migration steps to v4
-
-As described above, starting with v4, scopes have their own definition and can optionally be referenced by resources.
-Before v4, scopes were always contained within a resource.
-
-To migrate to v4 you need to split up scope and resource registration, typically by first registering all your scopes
-(e.g. using the `AddInMemoryApiScopes` method), and then register the API resources (if any) afterwards.
-The API resources will then reference the prior registered scopes by name.
 
 [[go back to index]](../index.md#documentation-structure)

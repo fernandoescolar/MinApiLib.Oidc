@@ -2,119 +2,165 @@
 
 # ASP.NET Core and API access
 
-In the previous quickstarts we explored both API access and user authentication.
-Now we want to bring the two parts together.
+The previous quickstarts covered API access and user authentication separately. This one brings them together: the
+web application calls the API with the signed-in user's access token.
 
-The beauty of the OpenID Connect & OAuth 2.0 combination is, that you can achieve both with a single protocol and a single exchange with the token service.
+OpenID Connect and OAuth 2.0 do both in one exchange. Once the client also asks for an API scope, the token endpoint
+returns two tokens: the identity token, with the outcome of the authentication, and an access token to call the API
+on behalf of the user. With the `offline_access` scope it also returns a refresh token, to get new access tokens
+without sending the user back to the server.
 
-So far we only asked for identity resources during the token request, once we start also including API resources, IdentityServer will return two tokens:
-the identity token containing the information about the authentication and session, and the access token to access APIs on behalf of the logged on user.
+Do [quickstart 1](1_client_credentials.md) and [quickstart 2](2_interactive_aspnetcore.md) first. The finished code
+is in [samples/](../../samples/README.md): `Server`, `Api` and `WebClient`.
 
 ## Modifying the client configuration
 
-Updating the client configuration in IdentityServer is straightforward - we simply need to add the `api1` resource to the allowed scopes list.
-In addition we enable support for refresh tokens via the `AllowOfflineAccess` property:
+On the server, allow the web client to ask for the API scope and for a refresh token (`AllowOfflineAccess`):
 
 ```csharp
 new Client
 {
-    ClientId = "mvc",
-    ClientSecrets = { new Secret("secret".Sha256()) },
-
-    AllowedGrantTypes = GrantTypes.Code,
-
-    // where to redirect to after login
-    RedirectUris = { "https://localhost:5002/signin-oidc" },
-
-    // where to redirect to after logout
-    PostLogoutRedirectUris = { "https://localhost:5002/signout-callback-oidc" },
+    ClientId = "web",
+    // ... as in quickstart 2
 
     AllowOfflineAccess = true,
-
-    AllowedScopes = new List<string>
-    {
-        IdentityServerConstants.StandardScopes.OpenId,
-        IdentityServerConstants.StandardScopes.Profile,
-        "api1"
-    }
+    AllowedScopes = { "openid", "profile", "email", "orders.read" }
 }
 ```
 
-## Modifying the MVC client
-
-All that’s left to do now in the client is to ask for the additional resources via the scope parameter. This is done in the OpenID Connect handler configuration:
+Optionally, put the user's name in the access token, for the API, with the API resource's `UserClaims`:
 
 ```csharp
-services.AddAuthentication(options =>
-{
-    options.DefaultScheme = "Cookies";
-    options.DefaultChallengeScheme = "oidc";
-})
-    .AddCookie("Cookies")
-    .AddOpenIdConnect("oidc", options =>
-    {
-        options.Authority = "https://localhost:5001";
-
-        options.ClientId = "mvc";
-        options.ClientSecret = "secret";
-        options.ResponseType = "code";
-
-        options.SaveTokens = true;
-
-        options.Scope.Add("api1");
-        options.Scope.Add("offline_access");
-    });
+new ApiResource("orders", "Orders API") { Scopes = { "orders.read" }, UserClaims = { "name" } }
 ```
 
-Since `SaveTokens` is enabled, ASP.NET Core will automatically store the resulting access and refresh token in the authentication session.
-You should be able to inspect the data on the page that prints out the contents of the session that you created earlier.
+## Modifying the web client
+
+Ask for the API scope and for a refresh token in the OpenID Connect handler:
+
+```csharp
+.AddOpenIdConnect("oidc", options =>
+{
+    // ... as in quickstart 2
+    options.Scope.Add("email");
+    options.Scope.Add("orders.read");
+    options.Scope.Add("offline_access");
+});
+```
+
+Because `SaveTokens` is on, the handler keeps the access token, the refresh token and the identity token in the
+authentication session, the application's cookie. You could read the access token with
+`await HttpContext.GetTokenAsync("access_token")` and set it on an `HttpClient` yourself, but then you also have to
+refresh it before it expires and write the new tokens back to the cookie. `MinApiLib.Oidc.Authentication`, which the
+web client already references, does that.
 
 ## Using the access token
 
-You can access the tokens in the session using the standard ASP.NET Core extension methods
-that you can find in the `Microsoft.AspNetCore.Authentication` namespace:
+Register the tokens of the `oidc` scheme, and an HTTP client for the API that sends them. Add this to
+`WebClient/Program.cs`, before `builder.Build()`:
 
 ```csharp
-var accessToken = await HttpContext.GetTokenAsync("access_token");
+// keep the tokens of the "oidc" sign-in in the session, and refresh them
+builder.Services.AddOpenIdConnectTokens("oidc");
+
+// the API: each request carries the signed-in user's access token
+builder.Services.AddHttpClient("orders", client => client.BaseAddress = new Uri("https://localhost:5003"))
+    .AddUserAccessTokenHandler();
 ```
 
-For accessing the API using the access token, all you need to do is retrieve the token, and set it on your HttpClient:
+and an endpoint that calls the API:
 
 ```csharp
-public async Task<IActionResult> CallApi()
+app.MapGet("/call-api", async (IHttpClientFactory clients) =>
+    Results.Content(await clients.CreateClient("orders").GetStringAsync("/orders"), "application/json"))
+    .RequireAuthorization();
+```
+
+* `AddOpenIdConnectTokens("oidc")` takes the name of the OpenID Connect scheme. It turns on `SaveTokens` for it and
+  records in the session which scheme signed the user in.
+* `AddUserAccessTokenHandler()` adds the handler that reads the user's access token from the session and sends it with
+  each request. It reads the session of the default authenticate scheme, here `cookie`; pass the scheme name if your
+  session lives elsewhere.
+
+Run the server, the API and the web client. Sign in at `https://localhost:5002`, then open
+`https://localhost:5002/call-api`. The web client sends:
+
+```http
+GET /orders HTTP/1.1
+Host: localhost:5003
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6...
+```
+
+and the API answers with the user and the client of the token:
+
+```json
 {
-    var accessToken = await HttpContext.GetTokenAsync("access_token");
-
-    var client = new HttpClient();
-    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-    var content = await client.GetStringAsync("https://localhost:6001/identity");
-
-    ViewBag.Json = JArray.Parse(content).ToString();
-    return View("json");
+  "client": "web",
+  "user": "1",
+  "orders": [ ... ]
 }
 ```
 
-Create a view called json.cshtml that outputs the json like this:
-
-```csharp
-<pre>@ViewBag.Json</pre>
-```
-
-Make sure the API is running, start the MVC client and call `/home/CallApi` after authentication.
+To get the token itself, for example to show it, use `IUserAccessTokenManager` (namespace
+`MinApiLib.Oidc.Authentication`): `await tokens.GetAccessTokenAsync(HttpContext)`.
 
 ## Managing the access token
 
-By far the most complex task for a typical client is to manage the access token. You typically want to
+The hard part of a client is managing the access token:
 
-* request the access and refresh token at login time
-* cache those tokens
-* use the access token to call APIs until it expires
-* use the refresh token to get a new access token
-* start over
+* request the access and refresh tokens at sign-in;
+* keep them;
+* use the access token until it expires;
+* use the refresh token to get a new access token;
+* start over.
 
-ASP.NET Core has many built-in facility that can help you with those tasks (like caching or sessions),
-but there is still quite some work left to do.
-Feel free to have a look at [this](https://github.com/IdentityModel/IdentityModel.AspNetCore) library, which can automate
-many of the boilerplate tasks.
+The handler does all of it. The access token lasts an hour (`Client.AccessTokenLifetime`). A minute before it
+expires (`RefreshBeforeExpiration`), the handler refreshes it with the refresh token, at the server's token endpoint,
+and writes the new tokens to the session cookie. Concurrent requests that hold the same refresh token share one
+refresh, so a one-time refresh token is not used twice. If the API answers `401`, the handler gets a new token and
+sends the request once more.
+
+Call the API before your response starts: once the response has started, the cookie can no longer be updated.
+
+On the server, refresh tokens are one-time only by default (`Client.RefreshTokenUsage = TokenUsage.OneTimeOnly`): each
+refresh returns a new refresh token, and reusing an old one revokes the user's refresh tokens for that client. They
+last 30 days (`AbsoluteRefreshTokenLifetime`). See [Refresh Tokens](../topics/refresh_tokens.md).
+
+## Binding the user's token to a key with DPoP
+
+As with the worker in [quickstart 1](1_client_credentials.md#binding-the-token-to-a-key-with-dpop), the user's tokens
+can be DPoP-bound, so a stolen access token or refresh token is useless without the key. The API already accepts
+DPoP-bound tokens if it has `.AddDPoP()`. In the web client, change one line:
+
+```csharp
+builder.Services.AddOpenIdConnectTokens("oidc", options => options.UseDPoP = true);
+```
+
+With `UseDPoP`, the library:
+
+1. creates a P-256 key for each sign-in, when the authorization request goes out, and keeps it, protected, in the
+   state and then in the session;
+2. sends the key's thumbprint in the authorization request (`dpop_jkt`), which binds the authorization code to the key;
+3. redeems the code with a proof of the key: the server answers `"token_type": "DPoP"` and the access token carries the
+   thumbprint in `cnf.jkt`;
+4. sends each API call with the `DPoP` scheme and a new proof, and refreshes the tokens with a proof of the same key.
+
+```http
+GET /orders HTTP/1.1
+Host: localhost:5003
+Authorization: DPoP eyJhbGciOiJSUzI1NiIsImtpZCI6...
+DPoP: eyJhbGciOiJFUzI1NiIsImp3ayI6eyJrdHkiOiJFQyIs...
+```
+
+Keep `GetClaimsFromUserInfoEndpoint = false`: the userinfo endpoint also requires a proof for a DPoP-bound token, and
+the OpenID Connect handler does not send one. The claims come in the identity token instead
+(`AlwaysIncludeUserClaimsInIdToken`).
+
+To make DPoP mandatory for the client, set `RequireDPoP = true` on it in the server: the token endpoint then refuses
+requests without a proof.
+
+The sample web client registers two OpenID Connect schemes side by side, `web` (bearer) and `web.dpop` (DPoP), and
+has buttons that play an attacker who stole the token. [Proof-of-Possession Access Tokens](../topics/pop.md) walks
+through the exchange message by message.
 
 [[go back to index]](../index.md#documentation-structure)

@@ -2,69 +2,79 @@
 
 # Deployment
 
-Your identity server is just a standard ASP.NET Core application including the IdentityServer middleware.
-Read the official Microsoft [documentation](https://docs.microsoft.com/en-us/aspnet/core/publishing) on publishing and deployment first
-(and especially the [section](https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-2.2#scenarios-and-use-cases) about load balancers and proxies).
+A server built with `MinApiLib.Oidc.Server` is a standard ASP.NET Core application. Read the Microsoft
+[documentation](https://learn.microsoft.com/aspnet/core/host-and-deploy/) on hosting and deployment first, especially
+the [section](https://learn.microsoft.com/aspnet/core/host-and-deploy/proxy-load-balancer) about proxies and load
+balancers: behind a proxy, use the forwarded headers middleware so the server sees the scheme and host the clients
+used, or set `OidcServerOptions.IssuerUri`.
 
 ## Typical architecture
 
-Typically you will design your IdentityServer deployment for high availability:
+Typically you will design the deployment for high availability:
 
-![image](topics/images/deployment.png)
+![image](images/deployment.png)
 
-IdentityServer itself is stateless and does not require server affinity - but there is data that needs to be shared between the instances.
+The server itself is stateless and needs no server affinity, but some data must be shared between the instances.
 
 ## Configuration data
 
 This typically includes:
 
-* resources
-* clients
-* startup configuration, e.g. key material, external provider settings etc…
+* resources;
+* clients;
+* startup configuration, for example key material and external provider settings.
 
-The way you store that data depends on your environment. In situations where configuration data rarely changes we recommend using the in-memory stores and code or configuration files.
+Where you keep it depends on your environment. When configuration rarely changes, use the in-memory stores, with
+code or configuration files. `AddOidcServer` accepts a configuration section for `OidcServerOptions`, and the
+`AddInMemory*` methods accept sections for clients and resources (see
+[configuration](https://learn.microsoft.com/aspnet/core/fundamentals/configuration/)).
 
-In highly dynamic environments (e.g. Saas) we recommend using a database or configuration service to load configuration dynamically.
-
-IdentityServer supports code configuration and configuration files (see [here](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration)) out of the box.
-For databases we provide support for [Entity Framework Core](https://github.com/IdentityServer/IdentityServer4.EntityFramework) based databases.
-
-You can also build your own configuration stores by implementing `IResourceStore` and `IClientStore`.
+In dynamic environments, load the configuration from a database. `MinApiLib.Oidc.Server.MongoDB` stores clients,
+resources and CORS origins in MongoDB (see [Startup](startup.md#refstartup)). You can also build your own stores by
+implementing `IClientStore`, `IResourceStore` and `ICorsPolicyService`, and cache them with `AddClientStoreCache`,
+`AddResourceStoreCache` and `AddCorsPolicyCache`.
 
 ## Key material
 
-Another important piece of startup configuration is your key material, see [here](crypto.md#refcrypto) for more details on key material and cryptography.
+The signing keys are part of the startup configuration, or are created and rotated by automatic key management, in
+a key store every instance shares. See [Cryptography, Keys and HTTPS](crypto.md#refcrypto).
 
 ## Operational data
 
-For certain operations, IdentityServer needs a persistence store to keep state, this includes:
+For some operations the server needs a store to keep state:
 
-* issuing authorization codes
-* issuing reference and refresh tokens
-* storing consent
+* authorization codes;
+* reference and refresh tokens;
+* consents;
+* pushed authorization requests and authorization nonces;
+* device codes of the device flow.
 
-You can either use a traditional database for storing operational data, or use a cache with persistence features like Redis.
-The EF Core implementation mentioned above has also support for operational data.
-
-You can also implement support for your own custom storage mechanism by implementing `IPersistedGrantStore` - by default IdentityServer injects an in-memory version.
+By default these live in memory: they are lost on restart and not shared between instances. The server logs a
+warning when it runs with the in-memory grant store outside the Development environment. Use
+`MinApiLib.Oidc.Server.MongoDB`, which also expires old entries with TTL indexes, or implement `IPersistedGrantStore`
+and `IDeviceFlowStore`. See [Persisted Grants](persisted_grants.md#refpersistedgrants).
 
 ## ASP.NET Core data protection
 
-ASP.NET Core itself needs shared key material for protecting sensitive data like cookies, state strings etc.
-See the official docs [here](https://docs.microsoft.com/en-us/aspnet/core/security/data-protection/).
-
-You can either re-use one of the above persistence store or use something simple like a shared file if possible.
+ASP.NET Core needs shared key material to protect cookies, state strings and similar data. The server also uses it,
+for example for the private keys of automatic key management. See the
+[data protection documentation](https://learn.microsoft.com/aspnet/core/security/data-protection/introduction).
 
 ## ASP.NET Core distributed caching
 
-Some components rely on ASP.NET Core distributed caching. In order to work in a multi server environment, this needs to be set up correctly.
-The [official docs](https://docs.microsoft.com/en-us/aspnet/core/performance/caching/distributed/) describe several options.
+Some components use `IDistributedCache`. `AddOidcServer` registers the in-memory implementation, which is not shared
+between instances; with several instances, register a distributed one (see the
+[documentation](https://learn.microsoft.com/aspnet/core/performance/caching/distributed)).
 
-The following components rely on `IDistributedCache`:
+These components use `IDistributedCache`:
 
-* `services.AddOidcStateDataFormatterCache()` configures the OpenIdConnect handlers to persist the state parameter into the server-side `IDistributedCache`.
-* `DefaultReplayCache`
-* `DistributedDeviceFlowThrottlingService`
-* `DistributedCacheAuthorizationParametersMessageStore`
+* `DefaultReplayCache` (`IReplayCache`), which remembers the DPoP proofs and client assertions already used, so each
+  is accepted once;
+* `DistributedDeviceFlowThrottlingService`, which throttles device flow polling, and the device flow interaction
+  service, which counts failed user code attempts;
+* `DistributedCacheAuthorizationParametersMessageStore`, if you register it with
+  `AddAuthorizationParametersMessageStore<T>`;
+* `services.AddOidcStateDataFormatterCache()`, which makes the OpenID Connect handlers of the application keep the
+  `state` parameter in the cache instead of the URL.
 
 [[go back to index]](../index.md#documentation-structure)

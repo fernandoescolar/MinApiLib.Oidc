@@ -1,175 +1,237 @@
 [[go back to index]](../index.md#documentation-structure)
 
-# Using ASP.NET Core Identity
+# Using ASP.NET Core Identity and passkeys
 
 #### NOTE
-For any pre-requisites (like e.g. templates) have a look at the [overview](0_overview.md#refquickstartoverview) first.
+For the prerequisites, see the [overview](0_overview.md) first.
 
-IdentityServer is designed for flexibility and part of that is allowing you to use any database you want for your users and their data (including passwords).
-If you are starting with a new user database, then ASP.NET Core Identity is one option you could choose.
-This quickstart shows how to use ASP.NET Core Identity with IdentityServer.
+The server works with any user store: the host checks the credentials on its login page and tells the server who
+signed in. ASP.NET Core Identity is a good choice for a new user database. It hashes passwords, handles lockout and,
+since .NET 10, passkeys (WebAuthn).
 
-The approach this quickstart takes to using ASP.NET Core Identity is to create a new project for the IdentityServer host.
-This new project will replace the prior IdentityServer project we built up in the previous quickstarts.
-The reason for this new project is due to the differences in UI assets when using ASP.NET Core Identity (mainly around the differences in login and logout).
-All the other projects in this solution (for the clients and the API) will remain the same.
+MinApiLib.Oidc has no ASP.NET Core Identity integration package (the IdentityServer `AddAspNetIdentity<TUser>()` was
+not ported). None is needed; you write three small pieces:
+
+1. the login page checks the user with `UserManager<TUser>` and signs the user in to the server's session, with the
+   user's id as subject id;
+2. a profile service reads the user's claims from `UserManager<TUser>` for the tokens;
+3. optionally, passkeys with `IPasskeyHandler<TUser>`.
+
+[samples/Server](../../samples/Server) does all three: its users live in ASP.NET Core Identity and sign in with a
+password or a passkey. This quickstart walks through its code; see the sample for the complete version.
 
 #### NOTE
-This quickstart assumes you are familiar with how ASP.NET Core Identity works. If you are not, it is recommended that you first [learn about it](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/identity).
+This quickstart assumes you know how ASP.NET Core Identity works. If you don't, read
+[its documentation](https://learn.microsoft.com/aspnet/core/security/authentication/identity) first.
 
-## New Project for ASP.NET Core Identity
+## Register ASP.NET Core Identity
 
-The first step is to add a new project for ASP.NET Core Identity to your solution.
-We provide a template that contains the minimal UI assets needed to ASP.NET Core Identity with IdentityServer.
-You will eventually delete the old project for IdentityServer, but there are some items that you will need to migrate over.
-
-Start by creating a new IdentityServer project that will use ASP.NET Core Identity:
+The server keeps its own session cookie, so it needs only Identity's core services (`UserManager<TUser>`, password
+hashing, validation), not its cookies or `SignInManager`:
 
 ```csharp
-cd quickstart/src
-dotnet new is4aspid -n IdentityServerAspNetIdentity
+builder.Services.AddOidcServer(options => options.KeyManagement.Enabled = true)
+    .AddInMemoryClients(Config.Clients)
+    .AddInMemoryIdentityResources(Config.IdentityResources)
+    .AddInMemoryApiScopes(Config.ApiScopes)
+    .AddInMemoryApiResources(Config.ApiResources)
+    .AddProfileService<UserProfileService>();
+
+builder.Services.AddIdentityCore<SampleUser>()
+    .AddUserStore<SampleUserStore>();
 ```
 
-When prompted to “seed” the user database, choose “Y” for “yes”.
-This populates the user database with our “alice” and “bob” users.
-Their passwords are “Pass123$”.
+The sample's [SampleUserStore](../../samples/Server/Users/SampleUserStore.cs) keeps two users and their passkeys in
+memory and implements `IUserPasswordStore<TUser>` and `IUserPasskeyStore<TUser>`. A real server uses a database:
+the Entity Framework Core stores of ASP.NET Core Identity (`AddEntityFrameworkStores<TContext>()`) or its own
+implementation of the store interfaces.
 
-#### NOTE
-The template uses Sqlite as the database for the users, and EF migrations are pre-created in the template. If you wish to use a different database provider, you will need to change the provider used in the code and re-create the EF migrations.
+## Sign the user in
 
-## Inspect the new project
-
-Open the new project in the editor of your choice, and inspect the generated code.
-Be sure to look at:
-
-### IdentityServerAspNetIdentity.csproj
-
-Notice the reference to IdentityServer4.AspNetIdentity.
-This NuGet package contains the ASP.NET Core Identity integration components for IdentityServer.
-
-### Startup.cs
-
-In ConfigureServices notice the necessary `AddDbContext<ApplicationDbContext>` and `AddIdentity<ApplicationUser, IdentityRole>` calls are done to configure ASP.NET Core Identity.
-
-Also notice that much of the same IdentityServer configuration you did in the previous quickstarts is already done.
-The template uses the in-memory style for clients and resources, and those are sourced from Config.cs.
-
-Finally, notice the addition of the new call to `AddAspNetIdentity<ApplicationUser>`.
-`AddAspNetIdentity` adds the integration layer to allow IdentityServer to access the user data for the ASP.NET Core Identity user database.
-This is needed when IdentityServer must add claims for the users into tokens.
-
-Note that `AddIdentity<ApplicationUser, IdentityRole>` must be invoked before `AddIdentityServer`.
-
-### Config.cs
-
-Config.cs contains the hard-coded in-memory clients and resource definitions.
-To keep the same clients and API working as the prior quickstarts, we need to copy over the configuration data from the old IdentityServer project into this one.
-Do that now, and afterwards Config.cs should look like this:
+The login page receives the authorize request in `returnUrl` (see [Sign-in](../topics/signin.md)). It finds the
+user, checks the password with `UserManager`, signs the user in to the server with `OidcServerUser` and returns to
+the authorize request. This is the sample's [LoginPage.cs](../../samples/Server/Pages/LoginPage.cs), shortened:
 
 ```csharp
-public static class Config
+var context = returnUrl == null ? null : await interaction.GetAuthorizationContextAsync(returnUrl);
+
+var user = username == null ? null : await users.FindByNameAsync(username);
+if (user == null || password == null || !await users.CheckPasswordAsync(user, password))
 {
-    public static IEnumerable<IdentityResource> IdentityResources =>
-        new List<IdentityResource>
+    return LoginPage.Render(http, antiforgery, returnUrl, context, "Invalid user name or password.");
+}
+
+await http.SignInAsync(new OidcServerUser(user.Id)
+{
+    DisplayName = user.Name,
+    AuthenticationMethods = ["pwd"]
+});
+
+return context != null ? Results.Redirect(returnUrl!) : Results.Redirect("/");
+```
+
+The subject id is the Identity user id (`UserManager.GetUserIdAsync`). It must never change, because clients and
+APIs identify the user by the `sub` claim. `AuthenticationMethods` becomes the `amr` claim (RFC 8176): `pwd` for a
+password.
+
+`SignInManager.PasswordSignInAsync` would sign the user in to Identity's own cookie (`Identity.Application`), which
+the server does not read. To get Identity's lockout handling, register `SignInManager` with `AddSignInManager()` and
+use `CheckPasswordSignInAsync`, which checks the password and counts failures without signing in; then sign in with
+`OidcServerUser` as above.
+
+## Issue the user's claims in tokens
+
+The server asks the [profile service](../reference/profileservice.md) (`IProfileService`, namespace
+`MinApiLib.Oidc.Server.Core.Users`) for the claims of the identity token, the userinfo endpoint and the access token,
+and whether the user is still active. The default one copies the requested claims from the session cookie: the
+sample puts `name` and `email` in the cookie (`OidcServerUser.AdditionalClaims`) and relies on it. Reading the user
+from `UserManager` instead keeps the tokens up to date, also for refresh tokens issued long after the sign-in, and
+stops issuing tokens to deleted or locked-out users:
+
+```csharp
+public sealed class UserProfileService(UserManager<SampleUser> users) : IProfileService
+{
+    public async Task GetProfileDataAsync(ProfileDataRequestContext context)
+    {
+        var user = await users.FindByIdAsync(context.Subject.GetSubjectId());
+        if (user == null)
         {
-            new IdentityResources.OpenId(),
-            new IdentityResources.Profile(),
+            return;
+        }
+
+        var claims = new List<Claim>
+        {
+            new(JwtClaimTypes.Name, user.Name),
+            new(JwtClaimTypes.Email, user.Email)
         };
 
-    public static IEnumerable<ApiScope> ApiScopes =>
-        new List<ApiScope>
+        if (users.SupportsUserClaim)
         {
-            new ApiScope("api1", "My API")
-        };
+            claims.AddRange(await users.GetClaimsAsync(user));
+        }
 
-    public static IEnumerable<Client> Clients =>
-        new List<Client>
-        {
-            // machine to machine client
-            new Client
-            {
-                ClientId = "client",
-                ClientSecrets = { new Secret("secret".Sha256()) },
+        // only the claims the client asked for, through its scopes and resources
+        context.AddRequestedClaims(claims);
+    }
 
-                AllowedGrantTypes = GrantTypes.ClientCredentials,
-                // scopes that client has access to
-                AllowedScopes = { "api1" }
-            },
-
-            // interactive ASP.NET Core MVC client
-            new Client
-            {
-                ClientId = "mvc",
-                ClientSecrets = { new Secret("secret".Sha256()) },
-
-                AllowedGrantTypes = GrantTypes.Code,
-
-                // where to redirect to after login
-                RedirectUris = { "https://localhost:5002/signin-oidc" },
-
-                // where to redirect to after logout
-                PostLogoutRedirectUris = { "https://localhost:5002/signout-callback-oidc" },
-
-                AllowedScopes = new List<string>
-                {
-                    IdentityServerConstants.StandardScopes.OpenId,
-                    IdentityServerConstants.StandardScopes.Profile,
-                    "api1"
-                }
-            }
-        };
+    public async Task IsActiveAsync(IsActiveContext context)
+    {
+        var user = await users.FindByIdAsync(context.Subject.GetSubjectId());
+        context.IsActive = user != null && !(users.SupportsUserLockout && await users.IsLockedOutAsync(user));
+    }
 }
 ```
 
-At this point, you no longer need the old IdentityServer project.
+`GetSubjectId` is in `MinApiLib.Oidc.Server.Core.Users` and `JwtClaimTypes` in `MinApiLib.Oidc.Server.Core.IdentityModel`.
+The protocol claims of the session (`sub`, `auth_time`, `idp`, `amr` and `acr`) reach the tokens without the profile
+service.
 
-### Program.cs and SeedData.cs
+## Passkeys
 
-Program.cs’s `Main` is a little different than most ASP.NET Core projects.
-Notice how this looks for a command line argument called /seed which is used as a flag to seed the users in the ASP.NET Core Identity database.
+Since .NET 10, ASP.NET Core Identity has `IPasskeyHandler<TUser>`. It makes the WebAuthn options for the browser and
+checks the browser's answers: signature, challenge, origin and signature counter. The store keeps the passkeys
+(`IUserPasskeyStore<TUser>`). The sample registers the handler and its options:
 
-Look at the `SeedData` class’ code to see how the database is created and the first users are created.
+```csharp
+builder.Services.TryAddScoped<IPasskeyHandler<SampleUser>, PasskeyHandler<SampleUser>>();
+builder.Services.Configure<IdentityPasskeyOptions>(options =>
+{
+    // discoverable passkeys, so the user signs in without typing a user name
+    options.ResidentKeyRequirement = "required";
+    options.UserVerificationRequirement = "preferred";
+});
+```
 
-### AccountController
+(The sample also sets `ValidateOrigin` to accept its `https://localhost:5001` origin; see its
+[Program.cs](../../samples/Server/Program.cs).)
 
-The last code to inspect in this template is the `AccountController`.
-This contains a slightly different login and logout code than the prior quickstart and templates.
-Notice the use of the `SignInManager<ApplicationUser>` and `UserManager<ApplicationUser>` from ASP.NET Core Identity to validate credentials and manage the authentication session.
+A passkey sign-in is two requests from the login page:
 
-Much of the rest of the code is the same from the prior quickstarts and templates.
+1. The page asks the server for the options (`IPasskeyHandler.MakeRequestOptionsAsync`). The server keeps the
+   ceremony state, with its challenge, until the answer arrives; the sample keeps it in an encrypted cookie for five
+   minutes ([PasskeyState.cs](../../samples/Server/Passkeys/PasskeyState.cs)). The browser asks the authenticator
+   with `navigator.credentials.get` ([PasskeyScripts.cs](../../samples/Server/Passkeys/PasskeyScripts.cs)).
+2. The page posts the browser's answer. The server checks it and signs the user in
+   ([PasskeyEndpoints.cs](../../samples/Server/Pages/PasskeyEndpoints.cs)):
 
-## Logging in with the MVC client
+```csharp
+var result = await passkeys.PerformAssertionAsync(new PasskeyAssertionContext
+{
+    HttpContext = http,
+    CredentialJson = credential,
+    AssertionState = state
+});
 
-At this point, you should be able to run all of the existing clients and samples.
-One exception is the ResourceOwnerClient – the password will need to be updated to `Pass123$` from `password`.
+if (!result.Succeeded)
+{
+    return LoginPage.Render(http, antiforgery, returnUrl, context, $"The passkey was not accepted: {result.Failure.Message}");
+}
 
-Launch the MVC client application, and you should be able to click the “Secure” link to get logged in.
+// keep the new signature counter, which reveals cloned authenticators
+await users.AddOrUpdatePasskeyAsync(result.User, result.Passkey);
+await Login.SignInWithPasskeyAsync(http, result.User, result.Passkey);
+```
 
-![image](quickstarts/images/aspid_mvc_client.png)
+Registering a passkey is the same with `MakeCreationOptionsAsync`, `navigator.credentials.create` and
+`PerformAttestationAsync`, on a page for the signed-in user ([PasskeysPage.cs](../../samples/Server/Pages/PasskeysPage.cs)).
 
-You should be redirected to the ASP.NET Core Identity login page.
-Login with your newly created user:
+### How the user signed in: amr and acr
 
-![image](quickstarts/images/aspid_login.png)
+[Login.cs](../../samples/Server/Login.cs) tells the clients how the user signed in, with the `amr` and `acr` claims:
 
-After login you see the normal consent page.
-After consent you will be redirected back to the MVC client application where your user’s claims should be listed.
+```csharp
+// a key on this device (hwk) or a synced one (swk); the authenticator verified the user (mfa) or not (user)
+var amr = new[] { passkey.IsBackedUp ? "swk" : "hwk", passkey.IsUserVerified ? "mfa" : "user" };
 
-![image](quickstarts/images/aspid_claims.png)
+var principal = new OidcServerUser(user.Id)
+{
+    DisplayName = user.Name,
+    AuthenticationMethods = amr,
+    AdditionalClaims = { new Claim("acr", "phr") }   // phishing-resistant
+};
 
-You should also be able to click “Call API using application identity” to invoke the API on behalf of the user:
+await http.SignInAsync(principal);
+```
 
-![image](quickstarts/images/aspid_api_claims.png)
+`phr` is the phishing-resistant authentication value of the OpenID Connect Extended Authentication Profile. A
+password sign-in gets `amr` = `pwd` and no `acr`.
 
-And now you’re using users from ASP.NET Core Identity in IdentityServer.
+## Step-up with acr_values
 
-## What’s Missing?
+A client can ask for a phishing-resistant sign-in with `acr_values=phr`. The login page reads the request from the
+authorization context and, in the sample, offers only the passkey:
 
-Much of the rest of the code in this template is similar to the other quickstart and templates we provide.
-The one thing you will notice that is missing from this template is UI code for user registration, password reset, and the other things you might expect from the Visual Studio ASP.NET Core Identity template.
+```csharp
+var context = await interaction.GetAuthorizationContextAsync(returnUrl);
+var requiresPasskey = context?.AcrValues.Contains("phr") == true;
+```
 
-Given the variety of requirements and different approaches to using ASP.NET Core Identity, our template deliberately does not provide those features.
-You are expected to know how ASP.NET Core Identity works sufficiently well to add those features to your project.
-Alternatively, you can create a new project based on the Visual Studio ASP.NET Core Identity template and add the IdentityServer features you have learned about in these quickstarts to that project.
+By default, as in OpenID Connect Core, `acr_values` is a voluntary request: it only reaches the login page, and a
+user who already has a session gets tokens whatever the values ask for. The sample turns on enforcement:
+
+```csharp
+builder.Services.AddOidcServer(options => options.Authentication.EnforceAcrValues = true);
+```
+
+With `EnforceAcrValues`, the authorize endpoint requires the session's `acr` claim to be one of the request's
+`acr_values`. A user who signed in with a password and then reaches a client that asks for `phr` is sent to the login
+page once, to sign in again with a passkey (step-up). If the session still does not meet the values when the user
+comes back, the client gets the `unmet_authentication_requirements` error at its redirect URI. The `idp:` and
+`tenant:` values are not checked. Turn it on only when the login page sets the `acr` claim of the sessions it creates.
+
+On the client side, the ASP.NET Core OpenID Connect handler removes `acr` from the user's claims by default; the
+sample web client keeps it with `options.ClaimActions.Remove("acr")`.
+
+## Try it
+
+Run the samples as their [README](../../samples/README.md#passkeys) describes: sign in as `bob` / `bob` on
+https://localhost:5001/account/passkeys, add a passkey, then use **Sign in with a passkey** on the web client. Its home
+page shows `amr` and `acr` from the identity token.
+
+## What's missing
+
+The sample has no registration, password reset, email confirmation or account management pages, and keeps the users
+in memory. ASP.NET Core Identity provides the building blocks for those (`UserManager<TUser>` creates users, resets
+passwords and generates confirmation tokens); you write the pages, as you do the login page.
 
 [[go back to index]](../index.md#documentation-structure)

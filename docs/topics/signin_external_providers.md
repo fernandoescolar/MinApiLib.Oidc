@@ -2,223 +2,187 @@
 
 # Sign-in with External Identity Providers
 
-ASP.NET Core has a flexible way to deal with external authentication. This involves a couple of steps.
+The login page can let users sign in with another identity provider: Microsoft Entra ID, Google, another OpenID
+Connect server, a SAML provider... The server does not need to know about them. They are ordinary ASP.NET Core
+authentication handlers, and the login page turns the external identity into a session at the server. It takes a few
+steps.
 
 #### NOTE
-If you are using ASP.NET Identity, many of the underlying technical details are hidden from you. It is recommended that you also read the Microsoft [docs](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/social/) and do the ASP.NET Identity [quickstart](../quickstarts/6_aspnet_identity.md#refaspnetidentityquickstart).
+ASP.NET Core Identity can hide some of these steps (`SignInManager.GetExternalLoginInfoAsync` and the external login
+stores). Microsoft's [documentation](https://learn.microsoft.com/aspnet/core/security/authentication/social/) covers
+that path. This page shows the steps without it.
 
 ## Adding authentication handlers for external providers
 
-The protocol implementation that is needed to talk to an external provider is encapsulated in an *authentication handler*.
-Some providers use proprietary protocols (e.g. social providers like Facebook) and some use standard protocols, e.g. OpenID Connect, WS-Federation or SAML2p.
-
-See this [quickstart](../quickstarts/2_interactive_aspnetcore.md#refexternalauthenticationquickstart) for step-by-step instructions for adding external authentication and configuring it.
+The protocol used to talk to an external provider is implemented by an *authentication handler*. Some providers use
+proprietary protocols (social providers such as Facebook) and others use standard ones: OpenID Connect,
+WS-Federation or SAML2p. Microsoft ships handlers for the common ones (for example
+`Microsoft.AspNetCore.Authentication.Google` and `Microsoft.AspNetCore.Authentication.OpenIdConnect`).
 
 ## The role of cookies
 
-One option on an external authentication handlers is called `SignInScheme`, e.g.:
+The `SignInScheme` option of an external handler names the cookie handler that keeps the result of the external
+sign-in, the claims the provider sent, for the few redirects until the login page has dealt with it.
+
+The server registers a cookie handler for this: `OidcServerConstants.ExternalCookieAuthenticationScheme`
+(`idsrv.external`). Use it as the `SignInScheme`:
 
 ```csharp
-services.AddAuthentication()
+builder.Services.AddOidcServer()
+    // ...
+    ;
+
+builder.Services.AddAuthentication()
     .AddGoogle("Google", options =>
     {
-        options.SignInScheme = "scheme of cookie handler to use";
+        options.SignInScheme = OidcServerConstants.ExternalCookieAuthenticationScheme;
 
         options.ClientId = "...";
         options.ClientSecret = "...";
-    })
+    });
 ```
 
-The signin scheme specifies the name of the cookie handler that will temporarily store the outcome of the external authentication,
-e.g. the claims that got sent by the external provider. This is necessary, since there are typically a couple of redirects involved until you are done with the
-external authentication process.
-
-Given that this is such a common practise, IdentityServer registers a cookie handler specifically for this external provider workflow.
-The scheme is represented via the `IdentityServerConstants.ExternalCookieAuthenticationScheme` constant.
-If you were to use our external cookie handler, then for the `SignInScheme` above you’d assign the value to be the `IdentityServerConstants.ExternalCookieAuthenticationScheme` constant:
+Or register your own cookie handler:
 
 ```csharp
-services.AddAuthentication()
+builder.Services.AddAuthentication()
+    .AddCookie("external")
     .AddGoogle("Google", options =>
     {
-        options.SignInScheme = IdentityServerConstants.ExternalCookieAuthenticationScheme;
+        options.SignInScheme = "external";
 
         options.ClientId = "...";
         options.ClientSecret = "...";
-    })
-```
-
-You can also register your own custom cookie handler instead, like this:
-
-```csharp
-services.AddAuthentication()
-    .AddCookie("YourCustomScheme")
-    .AddGoogle("Google", options =>
-    {
-        options.SignInScheme = "YourCustomScheme";
-
-        options.ClientId = "...";
-        options.ClientSecret = "...";
-    })
+    });
 ```
 
 #### NOTE
-For specialized scenarios, you can also short-circuit the external cookie mechanism and forward the external user directly to the main cookie handler. This typically involves handling events on the external handler to make sure you do the correct claims transformation from the external identity source.
+In special cases you can skip the external cookie and sign the external user in to the session cookie directly. That
+usually means handling the events of the external handler to transform the claims of the external identity.
 
 ## Triggering the authentication handler
 
-You invoke an external authentication handler via the `ChallengeAsync` extension method on the `HttpContext` (or using the MVC `ChallengeResult`).
-
-You typically want to pass in some options to the challenge operation, e.g. the path to your callback page and the name of the provider for bookkeeping, e.g.:
+The login page starts the external sign-in with a challenge to the provider's scheme. It passes the URL of its
+callback, and keeps the provider and the return URL in the authentication properties:
 
 ```csharp
-var callbackUrl = Url.Action("ExternalLoginCallback");
-
-var props = new AuthenticationProperties
+app.MapGet("/account/external", (string provider, string? returnUrl) =>
 {
-    RedirectUri = callbackUrl,
-    Items =
+    var properties = new AuthenticationProperties
     {
-        { "scheme", provider },
-        { "returnUrl", returnUrl }
-    }
-};
+        RedirectUri = "/account/external/callback",
+        Items =
+        {
+            ["scheme"] = provider,
+            ["returnUrl"] = returnUrl ?? "/"
+        }
+    };
 
-return Challenge(provider, props);
+    return Results.Challenge(properties, [provider]);
+});
 ```
+
+`IAuthenticationSchemeProvider.GetAllSchemesAsync()` lists the registered handlers, so the login page can show a
+button for each one. `AuthorizationRequest.IdP` (the `idp:` value of `acr_values`) and
+`Client.IdentityProviderRestrictions` tell it which ones a request allows (see the
+[federation gateway](federation_gateway.md)).
 
 ## Handling the callback and signing in the user
 
-On the callback page your typical tasks are:
+On the callback, the page usually:
 
-* inspect the identity returned by the external provider.
-* make a decision how you want to deal with that user. This might be different based on the fact if this is a new user or a returning user.
-* new users might need additional steps and UI before they are allowed in.
-* probably create a new internal user account that is linked to the external provider.
-* store the external claims that you want to keep.
-* delete the temporary cookie
-* sign-in the user
-
-**Inspecting the external identity**:
+* reads the identity the external provider returned;
+* decides what to do with the user, which can differ for new and returning users;
+* for new users, maybe asks for more information before letting them in;
+* finds the local user account linked to the external identity, or creates one;
+* keeps the external claims it needs;
+* deletes the temporary cookie;
+* signs the user in to the server and returns to the authorize request.
 
 ```csharp
-// read external identity from the temporary cookie
-var result = await HttpContext.AuthenticateAsync(IdentityServerConstants.ExternalCookieAuthenticationScheme);
-if (result?.Succeeded != true)
+app.MapGet("/account/external/callback", async (
+    HttpContext http,
+    IOidcServerInteractionService interaction,
+    UserStore users) =>
 {
-    throw new Exception("External authentication error");
-}
+    // the outcome of the external sign-in, from the temporary cookie
+    var result = await http.AuthenticateAsync(OidcServerConstants.ExternalCookieAuthenticationScheme);
+    if (result?.Succeeded != true)
+    {
+        return Results.BadRequest("External authentication error");
+    }
 
-// retrieve claims of the external user
-var externalUser = result.Principal;
-if (externalUser == null)
-{
-    throw new Exception("External authentication error");
-}
+    // the unique id of the external user: usually sub or NameIdentifier, depending on the provider
+    var externalUser = result.Principal;
+    var userIdClaim = externalUser.FindFirst(JwtClaimTypes.Subject)
+        ?? externalUser.FindFirst(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("Unknown user id");
 
-// retrieve claims of the external user
-var claims = externalUser.Claims.ToList();
+    var provider = result.Properties.Items["scheme"]!;
+    var returnUrl = result.Properties.Items["returnUrl"]!;
 
-// try to determine the unique id of the external user - the most common claim type for that are the sub claim and the NameIdentifier
-// depending on the external provider, some other claim type might be used
-var userIdClaim = claims.FirstOrDefault(x => x.Type == JwtClaimTypes.Subject);
-if (userIdClaim == null)
-{
-    userIdClaim = claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier);
-}
-if (userIdClaim == null)
-{
-    throw new Exception("Unknown userid");
-}
+    // your own code: find the user by provider and external id, or provision a new one
+    var user = await users.FindOrCreateExternalAsync(provider, userIdClaim.Value, externalUser.Claims);
 
-var externalUserId = userIdClaim.Value;
-var externalProvider = userIdClaim.Issuer;
+    // the session at the server
+    await http.SignInAsync(new OidcServerUser(user.Id)
+    {
+        DisplayName = user.Name,
+        IdentityProvider = provider
+    });
 
-// use externalProvider and externalUserId to find your user, or provision a new user
-```
+    // delete the temporary cookie
+    await http.SignOutAsync(OidcServerConstants.ExternalCookieAuthenticationScheme);
 
-**Clean-up and sign-in**:
-
-```csharp
-// issue authentication cookie for user
-await HttpContext.SignInAsync(new IdentityServerUser(user.SubjectId) {
-    DisplayName = user.Username,
-    IdentityProvider = provider,
-    AdditionalClaims = additionalClaims,
-    AuthenticationTime = DateTime.Now
+    // back to the authorize request, or to a local page: anything else could be an open redirect
+    return interaction.IsValidReturnUrl(returnUrl) || IsLocal(returnUrl)
+        ? Results.Redirect(returnUrl)
+        : Results.Redirect("/");
 });
-
-// delete temporary cookie used during external authentication
-await HttpContext.SignOutAsync(IdentityServerConstants.ExternalCookieAuthenticationScheme);
-
-// validate return URL and redirect back to authorization endpoint or a local page
-if (_interaction.IsValidReturnUrl(returnUrl) || Url.IsLocalUrl(returnUrl))
-{
-    return Redirect(returnUrl);
-}
-
-return Redirect("~/");
 ```
+
+`IsLocal` accepts paths such as `/account/passkeys` and rejects `//host` and `/\host`; the sample server's
+[Login.cs](../../samples/Server/Login.cs) has one.
+
+`JwtClaimTypes` is in the `MinApiLib.Oidc.Server.Core.IdentityModel` namespace. The `idp` claim set by
+`IdentityProvider` matters at sign-out: the logout page reads it to sign the user out of the external provider too
+(see [Sign-out of External Identity Providers](signout_external_providers.md)). Without `AuthenticationMethods`,
+`amr` is `external`. See [Sign-in](signin.md) for the other claims.
 
 ## State, URL length, and ISecureDataFormat
 
-When redirecting to an external provider for sign-in, frequently state from the client application must be round-tripped.
-This means that state is captured prior to leaving the client and preserved until the user has returned to the client application.
-Many protocols, including OpenID Connect, allow passing some sort of state as a parameter as part of the request, and the identity provider will return that state on the response.
-The OpenID Connect authentication handler provided by ASP.NET Core utilizes this feature of the protocol, and that is how it implements the `returnUrl` feature mentioned above.
+The client's state often has to make the round trip to the external provider: it is captured before the redirect
+and given back when the user returns. Many protocols, OpenID Connect included, have a request parameter for it,
+which the provider returns in its response. The ASP.NET Core OpenID Connect handler uses it, with the authentication
+properties above.
 
-The problem with storing state in a request parameter is that the request URL can get too large (over the common limit of 2000 characters).
-The OpenID Connect authentication handler does provide an extensibility point to store the state in your server, rather than in the request URL.
-You can implement this yourself by implementing `ISecureDataFormat<AuthenticationProperties>` and configuring it on the [OpenIdConnectOptions](https://github.com/aspnet/AspNetCore/blob/main/src/Security/Authentication/OpenIdConnect/src/OpenIdConnectOptions.cs#L249).
+That parameter can make the URL too long (over the common limit of 2000 characters). The OpenID Connect handler can
+keep the state on the server instead, with an `ISecureDataFormat<AuthenticationProperties>` in
+`OpenIdConnectOptions.StateDataFormat`.
 
-Fortunately, IdentityServer provides an implementation of this for you, backed by the `IDistributedCache` implementation registered in the DI container (e.g. the standard `MemoryDistributedCache`).
-To use the IdentityServer provided secure data format implementation, simply call the `AddOidcStateDataFormatterCache` extension method on the `IServiceCollection` when configuring DI.
-If no parameters are passed, then all OpenID Connect handlers configured will use the IdentityServer provided secure data format implementation:
+The server provides one, `DistributedCacheStateDataFormatter`, backed by the registered `IDistributedCache`
+(`AddOidcServer()` registers the in-memory one; use a shared cache when the server runs on several instances).
+`AddOidcStateDataFormatterCache` sets it on the OpenID Connect handlers. Without arguments it applies to all of them:
 
 ```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    // configures the OpenIdConnect handlers to persist the state parameter into the server-side IDistributedCache.
-    services.AddOidcStateDataFormatterCache();
+// keeps the state parameter of the OpenID Connect handlers in the IDistributedCache
+builder.Services.AddOidcStateDataFormatterCache();
 
-    services.AddAuthentication()
-        .AddOpenIdConnect("demoidsrv", "IdentityServer", options =>
-        {
-            // ...
-        })
-        .AddOpenIdConnect("aad", "Azure AD", options =>
-        {
-            // ...
-        })
-        .AddOpenIdConnect("adfs", "ADFS", options =>
-        {
-            // ...
-        });
-}
+builder.Services.AddAuthentication()
+    .AddOpenIdConnect("entra", "Microsoft Entra ID", options =>
+    {
+        // ...
+    })
+    .AddOpenIdConnect("adfs", "ADFS", options =>
+    {
+        // ...
+    });
 ```
 
-If only particular schemes are to be configured, then pass those schemes as parameters:
+To apply it to some handlers only, pass their schemes:
 
 ```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    // configures the OpenIdConnect handlers to persist the state parameter into the server-side IDistributedCache.
-    services.AddOidcStateDataFormatterCache("aad", "demoidsrv");
-
-    services.AddAuthentication()
-        .AddOpenIdConnect("demoidsrv", "IdentityServer", options =>
-        {
-            // ...
-        })
-        .AddOpenIdConnect("aad", "Azure AD", options =>
-        {
-            // ...
-        })
-        .AddOpenIdConnect("adfs", "ADFS", options =>
-        {
-            // ...
-        });
-}
+builder.Services.AddOidcStateDataFormatterCache("entra");
 ```
 
 [[go back to index]](../index.md#documentation-structure)

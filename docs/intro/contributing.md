@@ -2,47 +2,56 @@
 
 # Contributing
 
-We are very open to community contributions, but there are a couple of guidelines you should follow so we can handle this without too much effort.
+Contributions are welcome. Open an issue first to discuss a change, then send a pull request with the smallest change
+that does the job and tests that cover it.
 
-## How to contribute?
+## Building and testing
 
-The easiest way to contribute is to open an issue and start a discussion.
-Then we can decide if and how a feature or a change could be implemented.
-If you should submit a pull request with code changes, start with a description, only make the minimal changes to start with and provide tests that cover those changes.
+Requirements: the .NET SDK pinned in `global.json` (11.0.100 or a later feature band), and Docker for the MongoDB
+tests.
 
-Also read this first: [Being a good open source citizen](https://hackernoon.com/being-a-good-open-source-citizen-9060d0ab9732#.x3hocgw85)
+```bash
+dotnet build MinApiLib.Oidc.slnx
+```
 
-## General feedback and discussions?
+```bash
+dotnet test --solution MinApiLib.Oidc.slnx
+```
 
-Please start a discussion on the [core repo issue tracker](https://github.com/IdentityServer/IdentityServer4/issues).
+The tests run on xUnit v3 with Microsoft.Testing.Platform. The MongoDB tests start MongoDB in Docker
+(Testcontainers), so they need Docker running.
 
-## Bugs and feature requests?
+`tests/MinApiLib.Oidc.Server.IntegrationTests/Snapshots` pins the discovery document and the shape of an access
+token in `*.verified.json` files. A change writes a `*.received.json` file next to it; if the change is intended,
+replace the verified file with it.
 
-Please log a new issue in the appropriate GitHub repo:
+Mutation testing with [Stryker.NET](https://stryker-mutator.io/docs/stryker-net/introduction/) is set up as a local
+tool. A full run takes long, so narrow it with `--mutate`:
 
-* [Core](https://github.com/IdentityServer/IdentityServer4)
-* [AccessTokenValidation](https://github.com/IdentityServer/IdentityServer4.AccessTokenValidation)
+```bash
+dotnet tool restore
+dotnet stryker --mutate "**/Core/DPoP/DefaultDPoPProofValidator.cs"
+```
 
-## Contributing code and content
+## Conventions
 
-You will need to sign a Contributor License Agreement before you can contribute any code or content.
-This is an automated process that will start after you opened a pull request.
+* Build settings shared by every project live in `Directory.Build.props`; package versions are managed centrally in
+  `Directory.Packages.props`.
+* Warnings are errors, code style is enforced in the build (`.editorconfig`) and the .NET analyzers run in
+  `Recommended` mode. `tests/.editorconfig` relaxes some rules for test code.
+* Nullable reference types are enabled in every library.
+* Library code logs only through source-generated `[LoggerMessage]` methods (CA1848 is an error).
+* Tests use the xUnit assertions only. The server's integration tests carry a small test-only protocol client in
+  `Common/ProtocolClient`.
+* The server is organized in vertical slices, one folder per protocol feature, with what they share in `Core`. Default
+  services are registered with MinApiLib's `[RegisterInIServiceCollection]` attribute. See the
+  [server README](../../src/MinApiLib.Oidc.Server/README.md#layout).
+* Bug fixes and new features come with tests. Check that a fix's test fails without the fix.
 
-## Contribution projects
+## Licensing
 
-We very much appreciate if you start a contribution project (e.g. support for Database X or Configuration Store Y).
-Tell us about it so we can tweet and link it in our docs.
-
-We generally don’t want to take ownership of those contribution libraries, we are already really busy supporting the core projects.
-
-**Naming conventions**
-
-As of October 2017, the IdentityServer4.\* nuget namespace is reserved for our packages. Please use the following naming conventions:
-
-`YourProjectName.IdentityServer4`
-
-or
-
-`IdentityServer4.Contrib.YourProjectName`
+The code is licensed under the [Apache License 2.0](../../LICENSE). The server derives from IdentityServer4; keep the
+attribution in [NOTICE](../../NOTICE). By contributing, you agree that your contribution is licensed under the same
+terms.
 
 [[go back to index]](../index.md#documentation-structure)

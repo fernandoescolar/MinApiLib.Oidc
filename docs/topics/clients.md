@@ -2,7 +2,7 @@
 
 # Defining Clients
 
-Clients represent applications that can request tokens from your identityserver.
+Clients represent applications that can request tokens from the server.
 
 The details vary, but you typically define the following common settings for a client:
 
@@ -13,38 +13,43 @@ The details vary, but you typically define the following common settings for a c
 * a list of scopes (aka resources) the client is allowed to access
 
 #### NOTE
-At runtime, clients are retrieved via an implementation of the `IClientStore`. This allows loading them from arbitrary data sources like config files or databases. For this document we will use the in-memory version of the client store. You can wire up the in-memory store in `ConfigureServices` via the `AddInMemoryClients` extensions method.
+At runtime, clients are retrieved via an implementation of `IClientStore`. This allows loading them from arbitrary
+data sources like configuration files or databases. This page uses the in-memory client store, registered with the
+`AddInMemoryClients` builder method. `AddMongoStores` from `MinApiLib.Oidc.Server.MongoDB` keeps clients in MongoDB
+instead (see [Startup](startup.md#refstartup)). `Client` lives in `MinApiLib.Oidc.Server.Core.Models`; see the
+[client reference](../reference/client.md) for all its settings.
 
 ## Defining a client for server to server communication
 
 In this scenario no interactive user is present - a service (aka client) wants to communicate with an API (aka scope):
 
 ```csharp
-public class Clients
+public static class Clients
 {
-    public static IEnumerable<Client> Get()
-    {
-        return new List<Client>
+    public static IEnumerable<Client> Get() =>
+    [
+        new Client
         {
-            new Client
-            {
-                ClientId = "service.client",
-                ClientSecrets = { new Secret("secret".Sha256()) },
+            ClientId = "service.client",
+            ClientSecrets = { new Secret("secret".Sha256()) },
 
-                AllowedGrantTypes = GrantTypes.ClientCredentials,
-                AllowedScopes = { "api1", "api2.read_only" }
-            }
-        };
-    }
+            AllowedGrantTypes = GrantTypes.ClientCredentials,
+            AllowedScopes = { "api1", "api2.read_only" }
+        }
+    ];
 }
 ```
+
+Set `RequireDPoP = true` to make the client prove possession of a key on every token request; its access tokens are
+then bound to that key (see [Proof-of-Possession Access Tokens](pop.md)).
 
 <a id="startclientsmvc"></a>
 
 ## Defining an interactive application for use authentication and delegated API access
 
-Interactive applications (e.g. web applications or native desktop/mobile) applications use the authorization code flow.
-This flow gives you the best security because the access tokens are transmitted via back-channel calls only (and gives you access to refresh tokens):
+Interactive applications (e.g. web applications or native desktop/mobile applications) use the authorization code
+flow with PKCE. This flow gives you the best security because the access tokens are transmitted via back-channel
+calls only (and gives you access to refresh tokens). `RequirePkce` is `true` by default:
 
 ```csharp
 var interactiveClient = new Client
@@ -55,15 +60,15 @@ var interactiveClient = new Client
     AllowOfflineAccess = true,
     ClientSecrets = { new Secret("secret".Sha256()) },
 
-    RedirectUris =           { "http://localhost:21402/signin-oidc" },
-    PostLogoutRedirectUris = { "http://localhost:21402/" },
-    FrontChannelLogoutUri =    "http://localhost:21402/signout-oidc",
+    RedirectUris =           { "https://web.example.com/signin-oidc" },
+    PostLogoutRedirectUris = { "https://web.example.com/signout-callback-oidc" },
+    FrontChannelLogoutUri =    "https://web.example.com/signout-oidc",
 
     AllowedScopes =
     {
-        IdentityServerConstants.StandardScopes.OpenId,
-        IdentityServerConstants.StandardScopes.Profile,
-        IdentityServerConstants.StandardScopes.Email,
+        OidcServerConstants.StandardScopes.OpenId,
+        OidcServerConstants.StandardScopes.Profile,
+        OidcServerConstants.StandardScopes.Email,
 
         "api1", "api2.read_only"
     },
@@ -71,15 +76,18 @@ var interactiveClient = new Client
 ```
 
 #### NOTE
-see the [grant types](grant_types.md#refgranttypes) topic for more information on choosing the right grant type for your client.
+See the [grant types](grant_types.md#refgranttypes) topic for more information on choosing the right grant type
+for your client. The [sample server's Config.cs](../../samples/Server/Config.cs) defines a web client and a worker,
+each with bearer and DPoP-bound tokens.
 
 ## Defining clients in appsettings.json
 
-The `AddInMemoryClients` extensions method also supports adding clients from the ASP.NET Core configuration file. This allows you to define static clients directly from the appsettings.json file:
+The `AddInMemoryClients` method also accepts a section of the ASP.NET Core configuration. This allows you to
+define static clients in `appsettings.json`:
 
-```csharp
-"IdentityServer": {
-  "IssuerUri": "urn:sso.company.com",
+```json
+"OidcServer": {
+  "IssuerUri": "https://login.example.com",
   "Clients": [
     {
       "Enabled": true,
@@ -87,7 +95,7 @@ The `AddInMemoryClients` extensions method also supports adding clients from the
       "ClientName": "Local Development",
       "ClientSecrets": [ { "Value": "<Insert Sha256 hash of the secret encoded as Base64 string>" } ],
       "AllowedGrantTypes": [ "client_credentials" ],
-      "AllowedScopes": [ "api1" ],
+      "AllowedScopes": [ "api1" ]
     }
   ]
 }
@@ -96,7 +104,8 @@ The `AddInMemoryClients` extensions method also supports adding clients from the
 Then pass the configuration section to the `AddInMemoryClients` method:
 
 ```csharp
-AddInMemoryClients(configuration.GetSection("IdentityServer:Clients"))
+builder.Services.AddOidcServer(builder.Configuration.GetSection("OidcServer"))
+    .AddInMemoryClients(builder.Configuration.GetSection("OidcServer:Clients"));
 ```
 
 [[go back to index]](../index.md#documentation-structure)

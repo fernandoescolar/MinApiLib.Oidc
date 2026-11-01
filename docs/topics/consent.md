@@ -2,47 +2,72 @@
 
 # Consent
 
-During an authorization request, if IdentityServer requires user consent the browser will be redirected to the consent page.
+When a client requires consent, the authorize endpoint redirects the browser to the consent page during the
+authorization request.
 
-Consent is used to allow an end user to grant a client access to resources ([identity](../reference/identity_resource.md#refidentityresource) or [API](../reference/api_resource.md#refapiresource)).
-This is typically only necessary for third-party clients, and can be enabled/disabled per-client on the [client settings](../reference/client.md#refclient).
+Consent lets the user grant a client access to resources ([identity](../reference/identity_resource.md) or
+[API](../reference/api_resource.md)). It is usually only needed for third-party clients, and is turned on per client
+with `Client.RequireConsent` (off by default; see the [client settings](../reference/client.md)).
+`Client.AllowRememberConsent` lets the user's decision be remembered, and `Client.ConsentLifetime` limits how long.
 
-## Consent Page
+## Consent page
 
-In order for the user to grant consent, a consent page must be provided by the hosting application.
-The [quickstart UI](https://github.com/IdentityServer/IdentityServer4.Quickstart.UI) has a basic implementation of a consent page.
+The host writes the consent page; the server has none, and the [samples](../../samples/README.md) do not need one
+because their clients do not require consent.
 
-A consent page normally renders the display name of the current user,
-the display name of the client requesting access,
-the logo of the client,
-a link for more information about the client,
-and the list of resources the client is requesting access to.
-It’s also common to allow the user to indicate that their consent should be “remembered” so they are not prompted again in the future for the same client.
+A consent page usually shows the user's name, the client's display name, logo and a link with more information about
+it (`ClientName`, `LogoUri`, `ClientUri`), and the resources the client asks for. It often lets the user choose to
+remember the decision so the server does not ask again for the same client.
 
-Once the user has provided consent, the consent page must inform IdentityServer of the consent, and then the browser must be redirected back to the authorization endpoint.
+Once the user has decided, the page tells the server and redirects the browser back to the authorize endpoint.
 
-## Authorization Context
+## Authorization context
 
-IdentityServer will pass a returnUrl parameter (configurable on the [user interaction options](../reference/options.md#refoptions)) to the consent page which contains the parameters of the authorization request.
-These parameters provide the context for the consent page, and can be read with help from the [interaction service](../reference/interactionservice.md#refinteractionservice).
-The `GetAuthorizationContextAsync` API will return an instance of `AuthorizationRequest`.
+The server redirects to `UserInteraction.ConsentUrl` (default `/consent`) with the authorize request in the
+`UserInteraction.ConsentReturnUrlParameter` query parameter (default `returnUrl`); see the
+[options](../reference/options.md). `IOidcServerInteractionService.GetAuthorizationContextAsync(returnUrl)` reads
+it and returns an `AuthorizationRequest`, with the client and the requested resources in `ValidatedResources`. See
+the [interaction service](../reference/interactionservice.md).
 
-Additional details about the client or resources can be obtained using the `IClientStore` and `IResourceStore` interfaces.
+`IClientStore` and `IResourceStore` give more details about the client or the resources.
 
-## Informing IdentityServer of the consent result
+## Informing the server of the consent result
 
-The `GrantConsentAsync` API on the [interaction service](../reference/interactionservice.md#refinteractionservice) allows the consent page to inform IdentityServer of the outcome of consent (which might also be to deny the client access).
+`GrantConsentAsync` on the interaction service records the outcome: the scopes the user granted
+(`ConsentResponse.ScopesValuesConsented`), whether to remember the decision (`RememberConsent`), or a denial
+(`Error`, for example `AuthorizationError.AccessDenied`). `DenyAuthorizationAsync` is a shortcut for a denial:
 
-IdentityServer will temporarily persist the outcome of the consent.
-This persistence uses a cookie by default, as it only needs to last long enough to convey the outcome back to the authorization endpoint.
-This temporary persistence is different than the persistence used for the “remember my consent” feature (and it is the authorization endpoint which persists the “remember my consent” for the user).
-If you wish to use some other persistence between the consent page and the authorization redirect, then you can implement `IMessageStore<ConsentResponse>` and register the implementation in DI.
+```csharp
+var context = await interaction.GetAuthorizationContextAsync(returnUrl);
+if (context == null)
+{
+    return Results.Redirect("/home/error");
+}
+
+if (allowed)
+{
+    await interaction.GrantConsentAsync(context, new ConsentResponse
+    {
+        ScopesValuesConsented = scopes,
+        RememberConsent = remember
+    });
+}
+else
+{
+    await interaction.DenyAuthorizationAsync(context, AuthorizationError.AccessDenied);
+}
+
+return Results.Redirect(returnUrl);
+```
+
+The server keeps the outcome only until the browser is back at the authorize endpoint, in a cookie by default
+(`IConsentMessageStore`). That is not the remembered consent: the authorize endpoint stores that one, as a persisted
+grant, when the user asked to remember the decision.
 
 ## Returning the user to the authorization endpoint
 
-Once the consent page has informed IdentityServer of the outcome, the user can be redirected back to the returnUrl.
-Your consent page should protect against open redirects by verifying that the returnUrl is valid.
-This can be done by calling `IsValidReturnUrl` on the [interaction service](../reference/interactionservice.md#refinteractionservice).
-Also, if `GetAuthorizationContextAsync` returns a non-null result, then you can also trust that the returnUrl is valid.
+After informing the server, the page redirects the browser to the return URL. Protect against open redirects: when
+`GetAuthorizationContextAsync` returns a context the return URL is valid, and `IsValidReturnUrl` checks it without
+loading the context.
 
 [[go back to index]](../index.md#documentation-structure)

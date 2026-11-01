@@ -2,13 +2,15 @@
 
 # API Scope
 
-This class models an OAuth scope.
+The `ApiScope` class (namespace `MinApiLib.Oidc.Server.Core.Models`) models an OAuth scope that gives access to an
+API. See [Scopes](../topics/resources.md#scopes).
 
 `Enabled`
-: Indicates if this resource is enabled and can be requested. Defaults to true.
+: Indicates if this scope is enabled and can be requested. Defaults to `true`.
 
 `Name`
-: The unique name of the API. This value is used for authentication with introspection and will be added to the audience of the outgoing access token.
+: The unique name of the scope. This is the value a client will use for the `scope` parameter in the
+  authorize or token request.
 
 `DisplayName`
 : This value can be used e.g. on the consent screen.
@@ -16,28 +18,35 @@ This class models an OAuth scope.
 `Description`
 : This value can be used e.g. on the consent screen.
 
+`Required`
+: Specifies whether the user can de-select the scope on the consent screen (if the consent screen implements such
+  a feature). Defaults to `false`.
+
+`Emphasize`
+: Specifies whether the consent screen will emphasize this scope (if the consent screen implements such a feature).
+  Use this setting for sensitive or important scopes. Defaults to `false`.
+
+`ShowInDiscoveryDocument`
+: Specifies whether this scope is shown in the discovery document. Defaults to `true`.
+
 `UserClaims`
 : List of associated user claim types that should be included in the access token.
 
-## Defining API scope in appsettings.json
+`Properties`
+: Dictionary to hold any custom scope-specific values.
 
-The `AddInMemoryApiResource` extension method also supports adding clients from the ASP.NET Core configuration file:
+## Defining API scopes in appsettings.json
 
-```csharp
-"IdentityServer": {
-    "IssuerUri": "urn:sso.company.com",
+`AddInMemoryApiScopes` also accepts a configuration section:
+
+```json
+"OidcServer": {
     "ApiScopes": [
-        {
-            "Name": "IdentityServerApi"
-        },
         {
             "Name": "resource1.scope1"
         },
         {
             "Name": "resource2.scope1"
-        },
-        {
-            "Name": "scope3"
         },
         {
             "Name": "shared.scope"
@@ -51,10 +60,11 @@ The `AddInMemoryApiResource` extension method also supports adding clients from 
 }
 ```
 
-Then pass the configuration section to the `AddInMemoryApiScopes` method:
+Then pass the configuration section to `AddInMemoryApiScopes`:
 
 ```csharp
-AddInMemoryApiScopes(configuration.GetSection("IdentityServer:ApiScopes"))
+builder.Services.AddOidcServer()
+    .AddInMemoryApiScopes(builder.Configuration.GetSection("OidcServer:ApiScopes"));
 ```
 
 [[go back to index]](../index.md#documentation-structure)

@@ -2,41 +2,69 @@
 
 # End Session Endpoint
 
-The end session endpoint can be used to trigger single sign-out (see [spec](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)).
+The end session endpoint starts single sign-out (see
+[OpenID Connect RP-Initiated Logout](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)). A client
+redirects the user's browser to it. All the applications the user signed in to during the session can take part in
+the sign-out, through front-channel and back-channel logout (see [sign-out](../topics/signout.md)).
 
-To use the end session endpoint a client application will redirect the user’s browser to the end session URL.
-All applications that the user has logged into via the browser during the user’s session can participate in the sign-out.
+| Route | Parameters |
+|---|---|
+| `GET /connect/endsession` | In the query |
+| `POST /connect/endsession` | In an `application/x-www-form-urlencoded` body |
+| `GET /connect/endsession/callback` | Renders the front-channel logout iframes. The logout page loads it from `LogoutRequest.SignOutIFrameUrl`; clients do not call it |
 
-#### NOTE
-The URL for the end session endpoint is available via the [discovery endpoint](discovery.md#refdiscovery).
+With mutual TLS in path mode, the same routes also answer under `/connect/mtls/endsession`. Any other HTTP method gets
+`405` with an `Allow` header. The endpoint answers `404` when
+`OidcServerOptions.Endpoints.EnableEndSessionEndpoint` is `false`. Its URL is in the [discovery document](discovery.md)
+as `end_session_endpoint`.
+
+The endpoint validates the parameters, stores them and redirects the browser to the logout page,
+`UserInteraction.LogoutUrl` (`/account/logout` by default), with a `logoutId` parameter. The host writes that page: it
+reads the request with `IOidcServerInteractionService.GetLogoutContextAsync(logoutId)`, signs the user out and
+redirects to `PostLogoutRedirectUri` if there is one. [samples/Server](../../samples/Server/Pages/LogoutPage.cs) has a
+minimal one.
 
 ## Parameters
 
-**id_token_hint**
+`id_token_hint`
+: the identity token the client received. It identifies the client and the user. When it is valid and belongs to the
+  current user, `LogoutRequest.ShowSignoutPrompt` is `false`: the logout page can sign the user out without asking.
 
-When the user is redirected to the endpoint, they will be prompted if they really want to sign-out.
-This prompt can be bypassed by a client sending the original *id_token* received from authentication.
-This is passed as a query string parameter called `id_token_hint`.
+`client_id`
+: the client identifier. Without `id_token_hint`, it identifies the client so the server can validate
+  `post_logout_redirect_uri`. It does not authenticate the request, so the logout page should still ask the user to
+  confirm (`ShowSignoutPrompt` stays `true`). With `id_token_hint`, it must be the client of the token.
 
-**post_logout_redirect_uri**
+`post_logout_redirect_uri`
+: where to send the user after the sign-out. It is accepted only when the client is known (from `id_token_hint` or
+  `client_id`) and the value is one of the client's `PostLogoutRedirectUris` (see [client](../reference/client.md)).
+  Otherwise it is ignored.
 
-If a valid `id_token_hint` is passed, then the client may also send a `post_logout_redirect_uri` parameter.
-This can be used to allow the user to redirect back to the client after sign-out.
-The value must match one of the client’s pre-configured PostLogoutRedirectUris ([client docs](../reference/client.md#refclient)).
-
-**state**
-
-If a valid `post_logout_redirect_uri` is passed, then the client may also send a `state` parameter.
-This will be returned back to the client as a query string parameter after the user redirects back to the client.
-This is typically used by clients to round-trip state across the redirect.
+`state`
+: returned to the client as a query string parameter of `post_logout_redirect_uri`. Ignored without a valid
+  `post_logout_redirect_uri`.
 
 ## Example
 
-```csharp
-GET /connect/endsession?id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6IjdlOGFkZmMzMjU1OTEyNzI0ZDY4NWZmYmIwOThjNDEyIiwidHlwIjoiSldUIn0.eyJuYmYiOjE0OTE3NjUzMjEsImV4cCI6MTQ5MTc2NTYyMSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo1MDAwIiwiYXVkIjoianNfb2lkYyIsIm5vbmNlIjoiYTQwNGFjN2NjYWEwNGFmNzkzNmJjYTkyNTJkYTRhODUiLCJpYXQiOjE0OTE3NjUzMjEsInNpZCI6IjI2YTYzNWVmOTQ2ZjRiZGU3ZWUzMzQ2ZjFmMWY1NTZjIiwic3ViIjoiODg0MjExMTMiLCJhdXRoX3RpbWUiOjE0OTE3NjUzMTksImlkcCI6ImxvY2FsIiwiYW1yIjpbInB3ZCJdfQ.STzOWoeVYMtZdRAeRT95cMYEmClixWkmGwVH2Yyiks9BETotbSZiSfgE5kRh72kghN78N3-RgCTUmM2edB3bZx4H5ut3wWsBnZtQ2JLfhTwJAjaLE9Ykt68ovNJySbm8hjZhHzPWKh55jzshivQvTX0GdtlbcDoEA1oNONxHkpDIcr3pRoGi6YveEAFsGOeSQwzT76aId-rAALhFPkyKnVc-uB8IHtGNSyRWLFhwVqAdS3fRNO7iIs5hYRxeFSU7a5ZuUqZ6RRi-bcDhI-djKO5uAwiyhfpbpYcaY_TxXWoCmq8N8uAw9zqFsQUwcXymfOAi2UF3eFZt02hBu-shKA&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A7017%2Findex.html
+```http
+GET /connect/endsession?id_token_hint=eyJhbGciOiJSUzI1NiIsImtpZCI6IjhDNUM0RjJB…
+    &post_logout_redirect_uri=https%3A%2F%2Fweb.example.com%2Fsignout-callback-oidc
+    &state=CfDJ8Hw7 HTTP/1.1
+Host: login.example.com
 ```
 
-#### NOTE
-You can use the [IdentityModel](https://github.com/IdentityModel/IdentityModel2) client library to programmatically create end_session requests .NET code. For more information check the IdentityModel [docs](https://identitymodel.readthedocs.io/en/latest/client/end_session.html).
+```http
+HTTP/1.1 302 Found
+Location: https://login.example.com/account/logout?logoutId=CfDJ8MjQ…
+```
+
+An invalid request (for example an `id_token_hint` that does not validate, or that belongs to another user) is not
+an error for the browser: the user still reaches the logout page, without the client's parameters. After a `POST`
+request the redirect is a `303 See Other`.
+
+## Clients
+
+Microsoft's OpenID Connect handler sends this request when the application signs out of its OpenID Connect scheme
+(`SignOutAsync`), with `id_token_hint` when it saved the tokens.
 
 [[go back to index]](../index.md#documentation-structure)

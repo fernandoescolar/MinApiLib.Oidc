@@ -52,18 +52,19 @@ maps to IdentityServer's.
 
 | Feature | Configuration |
 |---|---|
-| Pushed authorization requests (RFC 9126) | `/connect/par`, on by default; `Client.RequirePushedAuthorization` |
+| Pushed authorization requests (RFC 9126) | `/connect/par`, on by default; `Client.RequirePushedAuthorization`. See [docs/topics/par.md](docs/topics/par.md) |
 | DPoP (RFC 9449) | Used when the client sends a `DPoP` header; `Client.RequireDPoP`. See [docs/topics/pop.md](docs/topics/pop.md) |
-| Resource indicators (RFC 8707) | `resource` parameter; `ApiResource.RequireResourceIndicator` |
-| Automatic signing key rotation | `OidcServerOptions.KeyManagement.Enabled`, off by default |
+| Resource indicators (RFC 8707) | `resource` parameter; `ApiResource.RequireResourceIndicator`. See [docs/topics/resources.md](docs/topics/resources.md) |
+| Automatic signing key rotation | `OidcServerOptions.KeyManagement.Enabled`, off by default. See [docs/topics/crypto.md](docs/topics/crypto.md) |
 | Issuer in authorization responses (RFC 9207) | `EmitIssuerIdentificationResponseParameter`, on by default |
-| Custom `prompt` values (for example `create` or `register`) | `AddPromptRedirect(prompt, url)` or `AddPromptHandler<T>(prompt)`; `UserInteraction.PromptValuesSupported` |
-| `client_id` at the end session endpoint | Validates `post_logout_redirect_uri` without an `id_token_hint`; the sign-out prompt is still shown |
-| Required `acr_values` and step-up | `Authentication.EnforceAcrValues`, off by default |
+| Custom `prompt` values (for example `create` or `register`) | `AddPromptRedirect(prompt, url)` or `AddPromptHandler<T>(prompt)`; `UserInteraction.PromptValuesSupported`. See [docs/topics/prompt.md](docs/topics/prompt.md) |
+| `client_id` at the end session endpoint | Validates `post_logout_redirect_uri` without an `id_token_hint`; the sign-out prompt is still shown. See [docs/endpoints/endsession.md](docs/endpoints/endsession.md) |
+| Required `acr_values` and step-up | `Authentication.EnforceAcrValues`, off by default. See [docs/quickstarts/6_aspnet_identity.md](docs/quickstarts/6_aspnet_identity.md) |
 
 The implicit flow, access tokens issued by the authorize endpoint and the resource owner password grant are
 deprecated by OAuth 2.1 and RFC 9700. They are available for existing clients, off by default, behind
-`Client.AllowImplicitFlow`, `Client.AllowAccessTokensViaBrowser` and `Client.AllowResourceOwnerPasswordFlow`.
+`Client.AllowImplicitFlow`, `Client.AllowAccessTokensViaBrowser` and `Client.AllowResourceOwnerPasswordFlow`. See
+[docs/topics/grant_types.md](docs/topics/grant_types.md).
 
 ## Samples
 
@@ -138,9 +139,9 @@ if the code is hosted on Azure Repos, and fill in `RepositoryUrl` in `Directory.
 
 ## Documentation
 
-Each package has its README. [docs/topics/pop.md](docs/topics/pop.md) walks through proof of possession message by
-message. The rest of [docs/](docs/index.md) is the IdentityServer4 documentation the fork kept: the protocol topics
-still apply, but its code uses IdentityServer's names (see the server README's table to map them).
+[docs/](docs/index.md) has quickstarts, topics, the endpoints and a reference of the server's options and models,
+derived from the IdentityServer4 documentation. Each package also has its README, and
+[docs/topics/pop.md](docs/topics/pop.md) walks through proof of possession message by message.
 
 ## License and attribution
 

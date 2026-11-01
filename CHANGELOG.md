@@ -18,6 +18,8 @@ Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.S
   [server README](src/MinApiLib.Oidc.Server/README.md#differences-from-the-identityserver-fork) maps every name.
 - Replace `using IdentityModel;` with `using MinApiLib.Oidc.Server.Core.IdentityModel;`. The server does not depend
   on the `IdentityModel` package.
+- Rename the local API scope. A client that calls the server's own APIs with the `IdentityServerApi` scope needs
+  `OidcServerApi`; the other values that carried the product name are listed in the server README.
 - Map the endpoints. Call `app.MapOidcServer()` as well as `app.UseOidcServer()`. Custom endpoints are MinApiLib
   endpoint records instead of `IEndpointHandler`.
 - Bring your own ASP.NET Core Identity integration. There is no `AddAspNetIdentity<TUser>()`: implement

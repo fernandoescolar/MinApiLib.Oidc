@@ -1,79 +1,74 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refevents"></a>
+
 # Events
 
-While logging is more low level “printf” style - events represent higher level information about certain operations in IdentityServer.
-Events are structured data and include event IDs, success/failure information, categories and details.
-This makes it easy to query and analyze them and extract useful information that can be used for further processing.
+While logging is low level, "printf" style, events represent higher level information about operations of the
+server. Events are structured data with an ID, a name, a category, a type (success, failure, information or error)
+and details. This makes them easy to query and analyze in event stores like
+[Elasticsearch](https://www.elastic.co/elastic-stack), [Seq](https://datalust.co/seq) or
+[Splunk](https://www.splunk.com/).
 
-Events work great with event stores like [ELK](https://www.elastic.co/webinars/introduction-elk-stack), [Seq](https://getseq.net/) or [Splunk](https://www.splunk.com/).
+The types live in `MinApiLib.Oidc.Server.Core.Events`; each built-in event lives in the namespace of the feature that
+raises it (for example `UserLoginSuccessEvent` in `MinApiLib.Oidc.Server.Features.Interaction`).
 
 ## Emitting events
 
-Events are not turned on by default - but can be globally configured in the `ConfigureServices` method, e.g.:
+Events are off by default. Turn them on with `OidcServerOptions.Events`:
 
 ```csharp
-services.AddIdentityServer(options =>
+builder.Services.AddOidcServer(options =>
 {
     options.Events.RaiseSuccessEvents = true;
     options.Events.RaiseFailureEvents = true;
     options.Events.RaiseErrorEvents = true;
+    options.Events.RaiseInformationEvents = true;
 });
 ```
 
-To emit an event use the `IEventService` from the DI container and call the `RaiseAsync` method, e.g.:
+The server raises its events itself. To raise one from your own code, for example from your login page, call
+`RaiseAsync` on the `IEventService` from the container:
 
 ```csharp
-public async Task<IActionResult> Login(LoginInputModel model)
+if (await users.CheckPasswordAsync(user, password))
 {
-    if (_users.ValidateCredentials(model.Username, model.Password))
-    {
-        // issue authentication cookie with subject ID and username
-        var user = _users.FindByUsername(model.Username);
-        await _events.RaiseAsync(new UserLoginSuccessEvent(user.Username, user.SubjectId, user.Username));
-    }
-    else
-    {
-        await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials"));
-    }
+    await events.RaiseAsync(new UserLoginSuccessEvent(user.UserName!, user.Id, user.UserName!, clientId: context?.Client.ClientId));
+}
+else
+{
+    await events.RaiseAsync(new UserLoginFailureEvent(userName, "invalid credentials", clientId: context?.Client.ClientId));
 }
 ```
 
+Here `users` is ASP.NET Core Identity's `UserManager<TUser>`, `events` the `IEventService` and `context` the
+`AuthorizationRequest` from `IOidcServerInteractionService.GetAuthorizationContextAsync(returnUrl)`.
+`IEventService.CanRaiseEventType` says whether events of a type are turned on.
+
 ## Custom sinks
 
-Our default event sink will simply serialize the event class to JSON and forward it to the ASP.NET Core logging system.
-If you want to connect to a custom event store, implement the `IEventSink` interface and register it with DI.
+The default sink, `DefaultEventSink`, serializes the event to JSON and writes it to the log at the `Information`
+level. To send events to an event store, implement `IEventSink` and register it in the container. Register it after
+`AddOidcServer`, or before it: either way it replaces the default (see [Startup](startup.md#refstartup)).
 
-The following example uses [Seq](https://getseq.net/) to emit events:
+The following example sends events to [Seq](https://datalust.co/seq) with the third-party Serilog library:
 
 ```csharp
- public class SeqEventSink : IEventSink
+public sealed class SeqEventSink : IEventSink
 {
-    private readonly Logger _log;
-
-    public SeqEventSink()
-    {
-        _log = new LoggerConfiguration()
-            .WriteTo.Seq("http://localhost:5341")
-            .CreateLogger();
-    }
+    private readonly Logger _log = new LoggerConfiguration()
+        .WriteTo.Seq("http://localhost:5341")
+        .CreateLogger();
 
     public Task PersistAsync(Event evt)
     {
-        if (evt.EventType == EventTypes.Success ||
-            evt.EventType == EventTypes.Information)
+        if (evt.EventType is EventTypes.Success or EventTypes.Information)
         {
-            _log.Information("{Name} ({Id}), Details: {@details}",
-                evt.Name,
-                evt.Id,
-                evt);
+            _log.Information("{Name} ({Id}), Details: {@details}", evt.Name, evt.Id, evt);
         }
         else
         {
-            _log.Error("{Name} ({Id}), Details: {@details}",
-                evt.Name,
-                evt.Id,
-                evt);
+            _log.Error("{Name} ({Id}), Details: {@details}", evt.Name, evt.Id, evt);
         }
 
         return Task.CompletedTask;
@@ -81,63 +76,79 @@ The following example uses [Seq](https://getseq.net/) to emit events:
 }
 ```
 
+```csharp
+builder.Services.AddSingleton<IEventSink, SeqEventSink>();
+```
+
 Add the `Serilog.Sinks.Seq` package to your host to make the above code work.
 
 ## Built-in events
 
-The following events are defined in IdentityServer:
+The server raises these events:
 
-`ApiAuthenticationFailureEvent` & `ApiAuthenticationSuccessEvent`
-: Gets raised for successful/failed API authentication at the introspection endpoint.
+`ApiAuthenticationSuccessEvent` & `ApiAuthenticationFailureEvent`
+: Successful/failed API authentication at the introspection endpoint.
 
 `ClientAuthenticationSuccessEvent` & `ClientAuthenticationFailureEvent`
-: Gets raised for successful/failed client authentication at the token endpoint.
+: Successful/failed client authentication, at the token endpoint and the other endpoints that authenticate clients.
 
 `TokenIssuedSuccessEvent` & `TokenIssuedFailureEvent`
-: Gets raised for successful/failed attempts to request identity tokens, access tokens, refresh tokens and authorization codes.
+: Successful/failed requests for identity tokens, access tokens, refresh tokens and authorization codes, at the token
+  and authorize endpoints.
 
 `TokenIntrospectionSuccessEvent` & `TokenIntrospectionFailureEvent`
-: Gets raised for successful token introspection requests.
+: Successful/failed token introspection requests.
 
 `TokenRevokedSuccessEvent`
-: Gets raised for successful token revocation requests.
+: Successful token revocation requests.
+
+`DeviceAuthorizationSuccessEvent` & `DeviceAuthorizationFailureEvent`
+: Successful/failed device authorization requests.
+
+`NonceIssuedSuccessEvent` & `NonceIssuedFailureEvent`
+: Successful/failed requests at the nonce endpoint.
 
 `UserLoginSuccessEvent` & `UserLoginFailureEvent`
-: Gets raised by the quickstart UI for successful/failed user logins.
+: Raised by the resource owner password grant (with `interactive: false`). Raise them from your login page too.
 
-`UserLogoutSuccessEvent`
-: Gets raised for successful logout requests.
-
-`ConsentGrantedEvent` & `ConsentDeniedEvent`
-: Gets raised in the consent UI.
+`InvalidClientConfigurationEvent`
+: A client loaded from the client store failed configuration validation.
 
 `UnhandledExceptionEvent`
-: Gets raised for unhandled exceptions.
+: An unhandled exception in a protocol endpoint.
 
-`DeviceAuthorizationFailureEvent` & `DeviceAuthorizationSuccessEvent`
-: Gets raised for successful/failed device authorization requests.
+These are defined for your own pages, which the server does not include, to raise:
+
+`UserLogoutSuccessEvent`
+: Successful logout.
+
+`ConsentGrantedEvent` & `ConsentDeniedEvent`
+: Consent granted or denied on the consent page.
+
+`GrantsRevokedEvent`
+: The user revoked the grants of a client.
 
 ## Custom events
 
-You can create your own events and emit them via our infrastructure.
+You can create your own events and raise them through the same infrastructure.
 
-You need to derive from our base `Event` class which injects contextual information like activity ID, timestamp, etc.
-Your derived class can then add arbitrary data fields specific to the event context:
+Derive from the base `Event` class, which adds contextual information like the activity ID, the timestamp, the
+process ID and the IP addresses. Your derived class can then add fields specific to the event. Pick an ID that does
+not collide with `EventIds`:
 
 ```csharp
-public class UserLoginFailureEvent : Event
+public class PasswordChangedEvent : Event
 {
-    public UserLoginFailureEvent(string username, string error)
+    public PasswordChangedEvent(string subjectId)
         : base(EventCategories.Authentication,
-                "User Login Failure",
-                EventTypes.Failure,
-                EventIds.UserLoginFailure,
-                error)
+               "Password Changed",
+               EventTypes.Information,
+               id: 9000)
     {
-        Username = username;
+        SubjectId = subjectId;
     }
 
-    public string Username { get; set; }
+    public string SubjectId { get; set; }
 }
 ```
 

@@ -2,89 +2,127 @@
 
 # Adding more API Endpoints
 
-It’s a common scenario to add additional API endpoints to the application hosting IdentityServer.
-These endpoints are typically protected by IdentityServer itself.
+It's a common scenario to add API endpoints to the application that hosts the server, protected by access tokens
+the server itself issues.
 
-For simple scenarios, we give you some helpers. See the advanced section to understand more of the internal plumbing.
+The server comes with a helper for that, the local API authentication handler (namespace
+`MinApiLib.Oidc.Server.Features.LocalApi`). It validates tokens with the server's own token validation, in process, so
+it needs no discovery document or HTTP calls, and it accepts reference tokens as well as JWTs. See the advanced
+section to understand more of the internal plumbing.
 
 #### NOTE
-You could achieve the same by using either our `IdentityServerAuthentication` handler or Microsoft’s `JwtBearer` handler. But this is not recommended since it requires more configuration and creates dependencies on external libraries that might lead to conflicts in future updates.
+You could achieve the same with Microsoft's `JwtBearer` handler pointed at the server itself, but that needs more
+configuration and fetches the server's own discovery document over HTTP.
 
-Start by registering your API as an `ApiResource`, e.g.:
+Start by registering your API as an `ApiScope` (or an `ApiResource` with that scope), e.g.:
 
 ```csharp
-public static IEnumerable<ApiResource> Apis = new List<ApiResource>
-{
+public static IEnumerable<ApiScope> ApiScopes =>
+[
     // local API
-    new ApiResource(IdentityServerConstants.LocalApi.ScopeName),
-};
+    new ApiScope(OidcServerConstants.LocalApi.ScopeName)
+];
 ```
 
-..and give your clients access to this API, e.g.:
+...and give your clients access to it, e.g.:
 
 ```csharp
 new Client
 {
     // rest omitted
-    AllowedScopes = { IdentityServerConstants.LocalApi.ScopeName },
+    AllowedScopes = { OidcServerConstants.LocalApi.ScopeName },
 }
 ```
 
 #### NOTE
-The value of `IdentityServerConstants.LocalApi.ScopeName` is `IdentityServerApi`.
+The value of `OidcServerConstants.LocalApi.ScopeName` is `OidcServerApi` (it was `IdentityServerApi` in
+IdentityServer).
 
-To enable token validation for local APIs, add the following to your IdentityServer startup:
+To enable token validation for local APIs, add the following to the server's startup:
 
 ```csharp
-services.AddLocalApiAuthentication();
+builder.Services.AddLocalApiAuthentication();
 ```
 
-To protect an API controller, decorate it with an `Authorize` attribute using the `LocalApi.PolicyName` policy:
+The endpoints themselves are MinApiLib endpoint records in the host's assembly, mapped with `app.MapEndpoints()`
+next to `app.MapOidcServer()`. To protect one, require the `OidcServerConstants.LocalApi.PolicyName` policy:
 
 ```csharp
-[Route("localApi")]
-[Authorize(LocalApi.PolicyName)]
-public class LocalApiController : ControllerBase
+public sealed record UsersEndpoint() : GetHandler<UsersEndpoint.Request>("/localapi/users")
 {
-    public IActionResult Get()
-    {
-        // omitted
-    }
+    public readonly record struct Request(HttpContext HttpContext);
+
+    protected override RouteHandlerBuilder Configure(RouteHandlerBuilder builder)
+        => builder.RequireAuthorization(OidcServerConstants.LocalApi.PolicyName);
+
+    protected override IResult Handle(Request request)
+        => Results.Ok(new { client = request.HttpContext.User.FindFirst("client_id")?.Value });
 }
 ```
 
-Authorized clients can then request a token for the `IdentityServerApi` scope and use it to call the API.
+```csharp
+var app = builder.Build();
+
+app.UseRouting();
+app.UseOidcServer();
+app.UseAuthorization();
+
+app.MapOidcServer();
+app.MapEndpoints();   // the host's own endpoint records, UsersEndpoint among them
+
+app.Run();
+```
+
+Authorized clients can then request a token for the `OidcServerApi` scope and use it to call the API:
+
+```http
+GET /localapi/users HTTP/1.1
+Host: login.example.com
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IjhDNUM0RjJB…
+```
+
+The handler also accepts DPoP-bound tokens, sent as `Authorization: DPoP <token>` with a `DPoP` proof, and rejects
+them when they are sent as bearer tokens (see [proof of possession](pop.md#dpop)). A request it rejects gets `401`.
+
+A custom endpoint that should behave like a protocol endpoint (events for unhandled exceptions, logging, left out of
+the API description) calls `AsOidcServerEndpoint(name, Path, GetType())` from its `Configure` (see "Custom endpoints"
+in the [server README](../../src/MinApiLib.Oidc.Server/README.md)).
 
 ## Discovery
 
-You can also add your endpoints to the discovery document if you want, e.g like this:
+You can also add your endpoints to the discovery document if you want, e.g. like this:
 
 ```csharp
-services.AddIdentityServer(options =>
+builder.Services.AddOidcServer(options =>
 {
     options.Discovery.CustomEntries.Add("local_api", "~/localapi");
-})
+});
 ```
 
 ## Advanced
 
 Under the covers, the `AddLocalApiAuthentication` helper does a couple of things:
 
-* adds an authentication handler that validates incoming tokens using IdentityServer’s built-in token validation engine (the name of this handler is `IdentityServerAccessToken` or `IdentityServerConstants.LocalApi.AuthenticationScheme`
-* configures the authentication handler to require a scope claim inside the access token of value `IdentityServerApi`
-* sets up an authorization policy that checks for a scope claim of value `IdentityServerApi`
+* adds an authentication handler that validates incoming tokens with the server's built-in token validation. Its
+  scheme name is `OidcServerAccessToken` (`OidcServerConstants.LocalApi.AuthenticationScheme`);
+* configures the handler to require a scope claim of value `OidcServerApi` in the access token
+  (`LocalApiAuthenticationOptions.ExpectedScope`);
+* sets up an authorization policy, `OidcServerConstants.LocalApi.PolicyName`, that authenticates with that scheme and
+  requires an authenticated user.
 
 This covers the most common scenarios. You can customize this behavior in the following ways:
 
-* Add the authentication handler yourself by calling `services.AddAuthentication().AddLocalApi(...)`
-  : * this way you can specify the required scope name yourself, or (by specifying no scope at all) accept any token from the current IdentityServer instance
-* Do your own scope validation/authorization in your controllers using custom policies or code, e.g.:
+* Add the authentication handler yourself by calling `builder.Services.AddAuthentication().AddLocalApi(...)`:
+  * this way you can specify the required scope name yourself, or (by specifying no scope at all) accept any token
+    from the server;
+  * `SaveToken` (on by default) stores the access token in the authentication properties.
+* Do your own scope validation/authorization in your endpoints using custom policies or code, e.g.:
   ```csharp
-  services.AddAuthorization(options =>
+  builder.Services.AddAuthorization(options =>
   {
-      options.AddPolicy(IdentityServerConstants.LocalApi.PolicyName, policy =>
+      options.AddPolicy(OidcServerConstants.LocalApi.PolicyName, policy =>
       {
-          policy.AddAuthenticationSchemes(IdentityServerConstants.LocalApi.AuthenticationScheme);
+          policy.AddAuthenticationSchemes(OidcServerConstants.LocalApi.AuthenticationScheme);
           policy.RequireAuthenticatedUser();
           // custom requirements
       });
@@ -97,7 +135,7 @@ You can provide a callback to transform the claims of the incoming token after v
 Either use the helper method, e.g.:
 
 ```csharp
-services.AddLocalApiAuthentication(principal =>
+builder.Services.AddLocalApiAuthentication(principal =>
 {
     principal.Identities.First().AddClaim(new Claim("additional_claim", "additional_value"));
 
@@ -105,6 +143,7 @@ services.AddLocalApiAuthentication(principal =>
 });
 ```
 
-…or implement the event on the options if you add the authentication handler manually.
+...or set `LocalApiAuthenticationOptions.Events` (`LocalApiAuthenticationEvents.OnClaimsTransformation`) if you add
+the authentication handler yourself.
 
 [[go back to index]](../index.md#documentation-structure)

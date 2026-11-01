@@ -2,40 +2,70 @@
 
 # Introspection Endpoint
 
-The introspection endpoint is an implementation of [RFC 7662](https://tools.ietf.org/html/rfc7662).
+The introspection endpoint implements [RFC 7662](https://www.rfc-editor.org/rfc/rfc7662). APIs use it to validate
+[reference tokens](../topics/reference_tokens.md), or JWTs when they cannot validate them themselves.
 
-It can be used to validate reference tokens (or JWTs if the consumer does not have support for appropriate JWT or cryptographic libraries).
-The introspection endpoint requires authentication - since the client of an introspection endpoint is an API, you configure the secret on the `ApiResource`.
+| Route | Parameters |
+|---|---|
+| `POST /connect/introspect` | In an `application/x-www-form-urlencoded` body. Any other content type gets `415` |
+
+With mutual TLS in path mode, the endpoint also answers at `/connect/mtls/introspect`. Any other HTTP method gets
+`405` with an `Allow` header. The endpoint answers `404` when
+`OidcServerOptions.Endpoints.EnableIntrospectionEndpoint` is `false`.
+
+The caller is an API, not a client: it authenticates with the name of its `ApiResource` and one of the resource's
+`ApiSecrets`, in an `Authorization: Basic` header or in the body (see [API resources](../reference/api_resource.md)).
+
+## Parameters
+
+`token`
+: the token to introspect (required).
 
 ## Example
 
-```csharp
-POST /connect/introspect
-Authorization: Basic xxxyyy
+```http
+POST /connect/introspect HTTP/1.1
+Host: login.example.com
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic b3JkZXJzOm9yZGVycy1zZWNyZXQ=
 
-token=<token>
+token=8F2A9C1E4B7D6A3F0C5E8B1D4A7C2E9F
 ```
 
-A successful response will return a status code of 200 and either an active or inactive token:
+An active token returns its claims, `active` and the token's scopes that belong to the calling API:
 
-```csharp
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
 {
-    "active": true,
-    "sub": "123"
+  "iss": "https://login.example.com",
+  "nbf": 1800000000,
+  "iat": 1800000000,
+  "exp": 1800003600,
+  "aud": "orders",
+  "client_id": "web",
+  "sub": "818727",
+  "auth_time": 1799999970,
+  "idp": "local",
+  "jti": "B7F1D2C3E4A5968778695A4B3C2D1E0F",
+  "active": true,
+  "scope": "orders.read"
 }
 ```
 
-Unknown or expired tokens will be marked as inactive:
+A bound token also returns its `cnf` claim (`jkt` for DPoP, `x5t#S256` for mutual TLS), so the API can check the
+binding. An unknown, expired or revoked token, or one without any scope of the calling API, is inactive:
 
-```csharp
+```json
 {
-    "active": false,
+  "active": false
 }
 ```
 
-An invalid request will return a 400, an unauthorized request 401.
+## Errors
 
-#### NOTE
-You can use the [IdentityModel](https://github.com/IdentityModel/IdentityModel2) client library to programmatically access the introspection endpoint from .NET code. For more information check the IdentityModel [docs](https://identitymodel.readthedocs.io/en/latest/client/introspection.html).
+* An API that fails to authenticate gets `401`, with no body.
+* A request without `token` gets `400` with `{ "error": "missing_token" }`.
 
 [[go back to index]](../index.md#documentation-structure)

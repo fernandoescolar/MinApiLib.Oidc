@@ -1,5 +1,7 @@
 [[go back to index]](../index.md#documentation-structure)
 
+<a id="refgranttypes"></a>
+
 # Grant Types
 
 The OpenID Connect and OAuth 2.0 specifications define so-called grant types (often also called flows - or protocol flows).
@@ -20,13 +22,14 @@ You can also specify the grant types list manually:
 ```csharp
 Client.AllowedGrantTypes =
 {
-    GrantType.Code,
+    GrantType.AuthorizationCode,
     GrantType.ClientCredentials,
     "my_custom_grant_type"
 };
 ```
 
-While IdentityServer supports all standard grant types, you really only need to know two of them for common application scenarios.
+`GrantTypes` and `GrantType` live in `MinApiLib.Oidc.Server.Core.Models`. The server supports all standard grant
+types, but you really only need to know two of them for common application scenarios.
 
 ## Machine to Machine Communication
 
@@ -35,7 +38,18 @@ This is the simplest type of communication. Tokens are always requested on behal
 In this scenario, you send a token request to the token endpoint using the `client credentials` grant type.
 The client typically has to authenticate with the token endpoint using its client ID and secret.
 
-See the [Client Credentials Quick Start](../quickstarts/1_client_credentials.md#refclientcredentialsquickstart) for a sample how to use it.
+```http
+POST /connect/token HTTP/1.1
+Host: login.example.com
+Authorization: Basic d29ya2VyOndvcmtlci1zZWNyZXQ=
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&scope=orders.read
+```
+
+See the [Client Credentials Quick Start](../quickstarts/1_client_credentials.md) for a sample. In .NET,
+[MinApiLib.Oidc.Http](../../src/MinApiLib.Oidc.Http/README.md) requests and renews these tokens for an `HttpClient`,
+as bearer or DPoP-bound tokens.
 
 ## Interactive Clients
 
@@ -81,11 +95,9 @@ This also solves the substitution problem, because the client can prove that it 
 
 **Summary**
 
-Interactive clients should use an authorization code-based flow. To protect against code substitution, either hybrid flow or PKCE should be used.
-If PKCE is available, this is the simpler solution to the problem.
-
-PKCE is already the official recommendation for [native](https://tools.ietf.org/html/rfc8252#section-6) applications
-and [SPAs](https://tools.ietf.org/html/draft-ietf-oauth-browser-based-apps-03#section-4) - and with the release of ASP.NET Core 3 also by default supported in the OpenID Connect handler as well.
+Interactive clients should use the authorization code flow with PKCE. OAuth 2.1 and RFC 9700 require PKCE for all
+clients, the ASP.NET Core OpenID Connect handler uses it by default, and the server requires it by default
+(`Client.RequirePkce` is `true`).
 
 This is how you would configure an interactive client:
 
@@ -94,16 +106,19 @@ var client = new Client
 {
     ClientId = "...",
 
-    // set client secret for confidential clients
-    ClientSecret = { ... },
+    // set client secrets for confidential clients
+    ClientSecrets = { new Secret("secret".Sha256()) },
 
-    // ...or turn off for public clients
-    RequireClientSecret = false,
+    // ...or turn them off for public clients
+    // RequireClientSecret = false,
 
-    AllowedGrantTypes = GrantTypes.Code,
-    RequirePkce = true
+    AllowedGrantTypes = GrantTypes.Code
 };
 ```
+
+The client can also push its authorization request to the server first ([pushed authorization requests](par.md)),
+and bind the code and its tokens to a key ([DPoP](pop.md)). The [samples](../../samples/README.md) sign in with the
+authorization code flow, PKCE and DPoP.
 
 ## Interactive clients without browsers or with constrained input devices
 
@@ -111,12 +126,14 @@ This grant type is detailed [RFC 8628](https://tools.ietf.org/html/rfc8628).
 
 This flow outsources user authentication and consent to an external device (e.g. a smart phone).
 It is typically used by devices that don’t have proper keyboards (e.g. TVs, gaming consoles…) and can request both identity and API resources.
+Use `GrantTypes.DeviceFlow`; the device authorization endpoint is `/connect/deviceauthorization`, and your pages
+complete the user's part with `IDeviceFlowInteractionService`.
 
 ## Deprecated flows
 
 OAuth 2.1 and RFC 9700 (OAuth 2.0 Security Best Current Practice) deprecate the implicit flow, access tokens issued
-by the authorize endpoint, and the resource owner password credentials grant. IdentityServer4 supported them; this
-fork keeps them for existing clients behind client flags that default to `false`:
+by the authorize endpoint, and the resource owner password credentials grant. IdentityServer4 supported them;
+`MinApiLib.Oidc.Server` keeps them for existing clients behind client flags that default to `false`:
 
 | Flow | Grant type | Client flag |
 |---|---|---|
@@ -138,8 +155,9 @@ new Client
 ```
 
 A client that lists `implicit` or `password` without its flag fails configuration validation, and the endpoints
-check the flags again on every request. An implicit request with the `openid` scope must carry a `nonce`. The
-deprecated response types and grant types are not published in the discovery document.
+check the flags again on every request. An implicit or hybrid request with the `openid` scope must carry a `nonce`.
+The deprecated response types and grant types are not published in the discovery document. The password grant also
+needs an `IResourceOwnerPasswordValidator`; see [Resource Owner Password Validation](resource_owner.md).
 
 ## Custom scenarios
 

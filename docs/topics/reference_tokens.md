@@ -4,34 +4,39 @@
 
 Access tokens can come in two flavours - self-contained or reference.
 
-A JWT token would be a self-contained access token - it’s a protected data structure with claims and an expiration.
-Once an API has learned about the key material, it can validate self-contained tokens without needing to communicate with the issuer.
-This makes JWTs hard to revoke. They will stay valid until they expire.
+A JWT is a self-contained access token: a protected data structure with claims and an expiration. Once an API has
+learned about the key material, it can validate self-contained tokens without communicating with the issuer. This
+makes JWTs hard to revoke: they stay valid until they expire.
 
-When using reference tokens - IdentityServer will store the contents of the token in a data store and will only issue a unique identifier for this token back to the client.
-The API receiving this reference must then open a back-channel communication to IdentityServer to validate the token.
+With reference tokens, the server stores the contents of the token in the [persisted grant store](persisted_grants.md#refpersistedgrants)
+and only gives the client a unique identifier for it. The API receiving this reference must then ask the server, over
+a back channel, to validate the token. Revoking it, or removing the grant from the store, ends it at once.
 
-![image](topics/images/reference_tokens.png)
+![image](images/reference_tokens.png)
 
-You can switch the token type of a client using the following setting:
+You can switch the token type of a client with the following setting:
 
 ```csharp
 client.AccessTokenType = AccessTokenType.Reference;
 ```
 
-IdentityServer provides an implementation of the OAuth 2.0 introspection specification which allows APIs to dereference the tokens.
-You can either use our dedicated [introspection handler](https://github.com/IdentityModel/IdentityModel.AspNetCore.OAuth2Introspection)
-or use the [identity server authentication handler](https://github.com/IdentityServer/IdentityServer4.AccessTokenValidation) which can validate both JWTs and reference tokens.
-
-The introspection endpoint requires authentication - since the client of an introspection endpoint is an API, you configure the secret on the `ApiResource`:
+The server implements OAuth 2.0 token introspection ([RFC 7662](https://tools.ietf.org/html/rfc7662)) at
+`/connect/introspect`, which lets APIs dereference the tokens. The introspection endpoint requires authentication.
+Since its client is an API, you configure the secret on the `ApiResource`:
 
 ```csharp
 var api = new ApiResource("api1")
 {
+    Scopes = { "api1.read" },
     ApiSecrets = { new Secret("secret".Sha256()) }
-}
+};
 ```
 
-See [here](apis.md#refprotectingapis) for more information on how to configure the IdentityServer authentication middleware for APIs.
+The response only lists the scopes of the token that belong to that API resource.
+
+MinApiLib.Oidc includes no introspection handler for APIs, and neither does ASP.NET Core: an ASP.NET Core API needs a
+third-party OAuth 2.0 introspection authentication handler, or its own. APIs hosted in the server itself can use the
+local API handler, which validates reference tokens in process. See [here](apis.md#refprotectingapis) for how to
+protect APIs, and the [introspection endpoint](../endpoints/introspection.md) for the request and response.
 
 [[go back to index]](../index.md#documentation-structure)
