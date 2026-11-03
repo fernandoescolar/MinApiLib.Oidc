@@ -8,6 +8,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
     private readonly IDeviceFlowCodeService _devices;
     private readonly IResourceStore _resourceStore;
     private readonly IScopeParser _scopeParser;
+    private readonly IConsentService _consent;
     private readonly IDistributedCache _cache;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly OidcServerOptions _options;
@@ -22,6 +23,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         IDeviceFlowCodeService devices,
         IResourceStore resourceStore,
         IScopeParser scopeParser,
+        IConsentService consent,
         IDistributedCache cache,
         IHttpContextAccessor httpContextAccessor,
         OidcServerOptions options,
@@ -33,6 +35,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         _devices = devices;
         _resourceStore = resourceStore;
         _scopeParser = scopeParser;
+        _consent = consent;
         _cache = cache;
         _httpContextAccessor = httpContextAccessor;
         _options = options;
@@ -72,25 +75,39 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         var subject = await _session.GetUserAsync();
         if (subject == null) return LogAndReturnError("No user present in device flow request", "Device authorization failure - no user found");
 
+        var denied = !consent.Granted;
         var requestedScopes = deviceAuth.RequestedScopes ?? [];
-        if (consent.ScopesValuesConsented?.Any(scope => !requestedScopes.Contains(scope)) == true)
+        if (!denied && consent.ScopesValuesConsented!.Any(scope => !requestedScopes.Contains(scope)))
         {
             return LogAndReturnError("Invalid scopes", "Device authorization failure - consented scopes were not requested by the device");
         }
 
         var sid = await _session.GetSessionIdAsync();
 
+        // A denial is stored as an authorization without scopes: the device code validator answers access_denied
+        // to the device's next poll.
         deviceAuth.IsAuthorized = true;
         deviceAuth.Subject = subject;
         deviceAuth.SessionId = sid;
         deviceAuth.Description = consent.Description;
-        deviceAuth.AuthorizedScopes = consent.ScopesValuesConsented;
-
-        if (consent.RememberConsent)
-        {
-        }
+        deviceAuth.AuthorizedScopes = denied ? [] : consent.ScopesValuesConsented;
 
         await _devices.UpdateByUserCodeAsync(userCode, deviceAuth);
+
+        if (denied)
+        {
+            ServicesLog.DeviceFlowAuthorizationDenied(_logger, subject.GetSubjectId(), client.ClientId);
+            return new DeviceFlowInteractionResult { IsAccessDenied = true };
+        }
+
+        // As at the authorize endpoint: remember the consented scopes, or forget an earlier consent.
+        if (client.AllowRememberConsent)
+        {
+            var parsedScopes = consent.RememberConsent
+                ? _scopeParser.ParseScopeValues(consent.ScopesValuesConsented!).ParsedScopes
+                : [];
+            await _consent.UpdateConsentAsync(subject, client, parsedScopes);
+        }
 
         return new DeviceFlowInteractionResult();
     }

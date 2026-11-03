@@ -264,6 +264,17 @@ public class EndSessionTests : IDisposable
 
     [Fact]
     [Trait("Category", Category)]
+    public async Task POST_without_a_form_should_return_415()
+    {
+        using var content = new StringContent("{}", Encoding.UTF8, "application/json");
+        var response = await _mockPipeline.BrowserClient.PostAsync(OidcServerPipeline.EndSessionEndpoint, content, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.False(_mockPipeline.LogoutWasCalled);
+    }
+
+    [Fact]
+    [Trait("Category", Category)]
     public async Task signout_callback_without_params_should_return_400()
     {
         var response = await _mockPipeline.BackChannelClient.GetAsync(OidcServerPipeline.EndSessionCallbackEndpoint, cancellationToken: TestContext.Current.CancellationToken);

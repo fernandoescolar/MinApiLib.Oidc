@@ -218,6 +218,12 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
 - **Disabled endpoints.** A disabled endpoint answers 404.
 - **Unsupported methods.** A request with a method the endpoint does not support gets a routing 405 with an `Allow`
   header, instead of a 405 or a 400 `invalid_request` from the endpoint.
+- **End session POST.** A `POST` to `/connect/endsession` without a form body gets 415, like the other form
+  endpoints, instead of failing while reading the form.
+- **Device flow denial.** `IDeviceFlowInteractionService.HandleRequestAsync` honours `ConsentResponse.Error`: the
+  device gets `access_denied` and the result has `IsAccessDenied`. Before, a response with an error and scopes
+  authorized the device. With `RememberConsent` and a client that allows it, the consent is stored, as at the
+  authorize endpoint.
 - **Null handling.** Places that could throw `NullReferenceException` now throw `InvalidOperationException` with a
   message, for example when a UI URL is not configured.
 - **Log events.** Log messages have new event ids. Interaction errors are logged as "Interaction error: …".

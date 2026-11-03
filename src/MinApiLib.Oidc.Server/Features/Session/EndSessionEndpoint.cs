@@ -21,6 +21,10 @@ internal abstract record EndSessionEndpoint(string Method, string Path) : Endpoi
     {
         var logger = request.Logger;
         var parameters = await ReadParametersAsync(request.HttpContext.Request, cancellationToken);
+        if (parameters == null)
+        {
+            return new StatusCodeResult(HttpStatusCode.UnsupportedMediaType);
+        }
 
         var user = await request.UserSession.GetUserAsync();
         logger.ProcessingSignoutRequest(user?.GetSubjectId() ?? "anonymous");
@@ -40,9 +44,9 @@ internal abstract record EndSessionEndpoint(string Method, string Path) : Endpoi
     }
 
     /// <summary>
-    /// Reads the end session request parameters.
+    /// Reads the end session request parameters, or returns <see langword="null"/> when the request has none to read.
     /// </summary>
-    protected abstract Task<NameValueCollection> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken);
+    protected abstract Task<NameValueCollection?> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -50,17 +54,24 @@ internal abstract record EndSessionEndpoint(string Method, string Path) : Endpoi
 /// </summary>
 internal abstract record EndSessionGetEndpoint(string Path) : EndSessionEndpoint(HttpMethods.Get, Path)
 {
-    protected override Task<NameValueCollection> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken)
-        => Task.FromResult(request.Query.AsNameValueCollection());
+    protected override Task<NameValueCollection?> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken)
+        => Task.FromResult<NameValueCollection?>(request.Query.AsNameValueCollection());
 }
 
 /// <summary>
-/// <c>POST</c> on the end session endpoint: the parameters are in a form.
+/// <c>POST</c> on the end session endpoint: the parameters are in an <c>application/x-www-form-urlencoded</c> form.
 /// </summary>
 internal abstract record EndSessionPostEndpoint(string Path) : EndSessionEndpoint(HttpMethods.Post, Path)
 {
-    protected override async Task<NameValueCollection> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken)
-        => (await request.ReadFormAsync(cancellationToken)).AsNameValueCollection();
+    protected override async Task<NameValueCollection?> ReadParametersAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        if (!request.HasApplicationFormContentType())
+        {
+            return null;
+        }
+
+        return (await request.ReadFormAsync(cancellationToken)).AsNameValueCollection();
+    }
 }
 
 // The routes. MinApiLib maps every non-abstract endpoint record of the assembly: the endpoint's path and, for

@@ -142,6 +142,9 @@ internal static partial class ServicesLog
     [LoggerMessage(0x642B, LogLevel.Error, "{ErrorDescription}")]
     public static partial void DeviceFlowInteractionError(ILogger logger, string errorDescription);
 
+    [LoggerMessage(0x644C, LogLevel.Information, "User {subjectId} denied the device authorization of client {clientId}")]
+    public static partial void DeviceFlowAuthorizationDenied(ILogger logger, string subjectId, string clientId);
+
     // DefaultUserSession
     [LoggerMessage(0x642C, LogLevel.Error, "Error decoding client list")]
     public static partial void ClientListDecodeFailed(ILogger logger, Exception exception);

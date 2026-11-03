@@ -14,7 +14,7 @@ the sign-out, through front-channel and back-channel logout (see [sign-out](../t
 | `GET /connect/endsession/callback` | Renders the front-channel logout iframes. The logout page loads it from `LogoutRequest.SignOutIFrameUrl`; clients do not call it |
 
 With mutual TLS in path mode, the same routes also answer under `/connect/mtls/endsession`. Any other HTTP method gets
-`405` with an `Allow` header. The endpoint answers `404` when
+`405` with an `Allow` header, and a `POST` without a form body gets `415`. The endpoint answers `404` when
 `OidcServerOptions.Endpoints.EnableEndSessionEndpoint` is `false`. Its URL is in the [discovery document](discovery.md)
 as `end_session_endpoint`.
 
