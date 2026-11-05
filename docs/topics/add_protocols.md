@@ -86,8 +86,8 @@ public interface IReturnUrlParser
 }
 ```
 
-...and register the parser in the service collection, after `AddOidcServer()`, so it is added next to the OpenID
-Connect parser:
+...and register it in the service collection. It is added next to the OpenID Connect parser, whether you register it
+before or after `AddOidcServer()`:
 
 ```csharp
 builder.Services.AddOidcServer();

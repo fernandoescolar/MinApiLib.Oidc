@@ -13,9 +13,9 @@ store, the persisted grant store, an implementation of `IPersistedGrantStore` (n
 ## Stores
 
 **In memory.** `AddOidcServer` registers `InMemoryPersistedGrantStore` and an in-memory `IDeviceFlowStore`
-(`AddInMemoryPersistedGrants`). They suit development and tests: the grants are lost on restart, are not shared
-between instances, and expired grants are not cleaned up. The server logs a warning when it runs with the in-memory
-grant store outside the Development environment.
+(`AddInMemoryPersistedGrants`). They suit development and tests: the grants are lost on restart and are not shared
+between instances. Storing a grant or a device code also removes the expired ones, at most once a minute. The server
+logs a warning when it runs with the in-memory grant store outside the Development environment.
 
 **MongoDB.** The `MinApiLib.Oidc.Server.MongoDB` package stores grants in its `persistedGrants` collection and device
 codes in `deviceCodes`, with TTL indexes on `Expiration`, so MongoDB deletes expired entries:

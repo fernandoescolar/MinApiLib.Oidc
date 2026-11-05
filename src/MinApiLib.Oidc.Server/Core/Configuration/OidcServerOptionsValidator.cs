@@ -33,9 +33,15 @@ internal sealed class OidcServerOptionsValidator : IValidateOptions<OidcServerOp
             }
         }
 
-        if (options.DeviceFlow.Interval <= 0 || options.DeviceFlow.UserCodeMaxFailedAttempts <= 0)
+        if (options.DeviceFlow.Interval <= 0)
         {
-            failures.Add($"{nameof(options.DeviceFlow)}.{nameof(options.DeviceFlow.Interval)} and {nameof(options.DeviceFlow.UserCodeMaxFailedAttempts)} must be positive.");
+            failures.Add($"{nameof(options.DeviceFlow)}.{nameof(options.DeviceFlow.Interval)} must be positive.");
+        }
+
+        // Zero disables the limit on failed user code lookups.
+        if (options.DeviceFlow.UserCodeMaxFailedAttempts < 0)
+        {
+            failures.Add($"{nameof(options.DeviceFlow)}.{nameof(options.DeviceFlow.UserCodeMaxFailedAttempts)} must not be negative.");
         }
 
         if (options.PushedAuthorization.Lifetime <= 0)

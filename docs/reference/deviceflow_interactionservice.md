@@ -34,7 +34,8 @@ var result = await deviceInteraction.HandleRequestAsync(userCode, allowed
 
 Both methods count failed user code lookups: after `DeviceFlowOptions.UserCodeMaxFailedAttempts` failures (5 by
 default) for a user, or for a client IP address when nobody is signed in, lookups fail until
-`DeviceFlowOptions.UserCodeFailedAttemptsWindow` (5 minutes by default) passes. See [options](options.md#device-flow).
+`DeviceFlowOptions.UserCodeFailedAttemptsWindow` (5 minutes by default) passes. A limit of `0` turns the count off. See
+[options](options.md#device-flow).
 
 ## DeviceFlowAuthorizationRequest
 

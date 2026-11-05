@@ -136,6 +136,34 @@ public class MinApiLibHostingTests : IDisposable
 
     [Fact]
     [Trait("Category", Category)]
+    public void Return_url_parsers_registered_before_AddOidcServer_are_added_next_to_the_default()
+    {
+        var parser = new StubReturnUrlParser();
+        _pipeline.OnPreConfigureServices += services => services.AddSingleton<IReturnUrlParser>(parser);
+        _pipeline.Initialize();
+        using var scope = _pipeline.Server.Services.CreateScope();
+
+        var parsers = scope.ServiceProvider.GetServices<IReturnUrlParser>().ToList();
+        Assert.Contains(parser, parsers);
+        Assert.Contains(parsers, p => p is OidcReturnUrlParser);
+    }
+
+    [Theory]
+    [Trait("Category", Category)]
+    [InlineData(0, true)]
+    [InlineData(-1, false)]
+    public void UserCodeMaxFailedAttempts_can_be_zero_but_not_negative(int value, bool valid)
+    {
+        var options = new OidcServerOptions();
+        options.DeviceFlow.UserCodeMaxFailedAttempts = value;
+
+        var result = new OidcServerOptionsValidator().Validate(null, options);
+
+        Assert.Equal(valid, result.Succeeded);
+    }
+
+    [Fact]
+    [Trait("Category", Category)]
     public async Task Unhandled_exception_raises_an_event()
     {
         var sink = new CapturingEventSink();
@@ -179,6 +207,13 @@ public class MinApiLibHostingTests : IDisposable
         public Task<Token> CreateAccessTokenAsync(TokenCreationRequest request) => throw new NotSupportedException();
 
         public Task<string> CreateSecurityTokenAsync(Token token) => throw new NotSupportedException();
+    }
+
+    private sealed class StubReturnUrlParser : IReturnUrlParser
+    {
+        public Task<AuthorizationRequest> ParseAsync(string returnUrl) => Task.FromResult<AuthorizationRequest>(null);
+
+        public bool IsValidReturnUrl(string returnUrl) => false;
     }
 
     private sealed class StubProfileService : IProfileService

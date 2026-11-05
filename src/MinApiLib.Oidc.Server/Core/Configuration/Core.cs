@@ -59,7 +59,8 @@ public static class OidcServerBuilderExtensionsCore
     /// The services marked with <c>[RegisterInIServiceCollection]</c> are found by MinApiLib's <c>AddAssembly</c> and
     /// tried, not added: a service the host registered before <c>AddOidcServer()</c> keeps its implementation, and one
     /// registered after it (as the builder's <c>Add*</c> methods do) is the one the container resolves. The services
-    /// with several implementations, secret parsers and validators and options setups, are added next to the host's.
+    /// with several implementations, secret parsers and validators, return URL parsers and options setups, are added
+    /// next to the host's.
     /// </remarks>
     public static IOidcServerBuilder AddDefaultServices(this IOidcServerBuilder builder)
     {
@@ -95,7 +96,7 @@ public static class OidcServerBuilderExtensionsCore
 
     private static bool IsEnumerable(Type serviceType)
     {
-        if (serviceType == typeof(ISecretParser) || serviceType == typeof(ISecretValidator))
+        if (serviceType == typeof(ISecretParser) || serviceType == typeof(ISecretValidator) || serviceType == typeof(IReturnUrlParser))
         {
             return true;
         }

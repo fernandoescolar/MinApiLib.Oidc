@@ -28,7 +28,7 @@ instead of failing on the first request that reads them. The checks:
 * `IssuerUri`, when set, is an absolute `http` or `https` URL without query or fragment (RFC 8414 section 2).
 * `Authentication.CookieLifetime` is positive.
 * Every `InputLengthRestrictions` value is positive.
-* `DeviceFlow.Interval` and `DeviceFlow.UserCodeMaxFailedAttempts` are positive.
+* `DeviceFlow.Interval` is positive, and `DeviceFlow.UserCodeMaxFailedAttempts` is not negative.
 * `PushedAuthorization.Lifetime` is positive.
 * `DPoP.ProofTokenValidityDuration` is positive, `DPoP.ClockSkew` is not negative, and
   `DPoP.SupportedSigningAlgorithms` is a non-empty list of RS\*, PS\* or ES\* algorithms.
@@ -266,7 +266,7 @@ endpoints, with ASP.NET Core's CORS implementation. See [CORS](../topics/cors.md
 * `UserCodeMaxFailedAttempts`
   : The maximum number of failed user code lookups for one user (or one client IP address when nobody is signed
     in) within `UserCodeFailedAttemptsWindow`. Further lookups fail until the window passes, which limits brute
-    forcing of user codes (RFC 8628 section 5.1). Defaults to `5`.
+    forcing of user codes (RFC 8628 section 5.1). `0` disables the limit. Defaults to `5`.
 * `UserCodeFailedAttemptsWindow`
   : The window in which failed user code lookups are counted. Defaults to 5 minutes.
 

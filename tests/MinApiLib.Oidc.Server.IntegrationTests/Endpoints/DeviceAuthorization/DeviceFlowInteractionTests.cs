@@ -8,6 +8,7 @@ public class DeviceFlowInteractionTests : IDisposable
     private readonly OidcServerPipeline _pipeline = new();
     private ConsentResponse _consent;
     private DeviceFlowInteractionResult _result;
+    private bool _initialized;
 
     public DeviceFlowInteractionTests()
     {
@@ -28,8 +29,6 @@ public class DeviceFlowInteractionTests : IDisposable
             var interaction = context.RequestServices.GetRequiredService<IDeviceFlowInteractionService>();
             _result = await interaction.HandleRequestAsync(context.Request.Query["userCode"].ToString(), _consent);
         }));
-
-        _pipeline.Initialize();
     }
 
     public void Dispose()
@@ -115,8 +114,36 @@ public class DeviceFlowInteractionTests : IDisposable
         Assert.Null(await store.GetUserConsentAsync("bob", "device"));
     }
 
+    [Theory]
+    [Trait("Category", Category)]
+    [InlineData(0, false)]
+    [InlineData(5, true)]
+    public async Task Failed_user_code_lookups_are_limited_unless_the_limit_is_zero(int limit, bool blocked)
+    {
+        _pipeline.OnPostConfigureServices += services =>
+            services.Configure<OidcServerOptions>(options => options.DeviceFlow.UserCodeMaxFailedAttempts = limit);
+        var device = await StartAsync();
+        var consent = new ConsentResponse { ScopesValuesConsented = ["openid"] };
+
+        for (var i = 0; i < 6; i++)
+        {
+            await CompleteAsync(JsonNode.Parse(@"{""user_code"": ""wrong""}"), consent);
+            Assert.True(_result.IsError);
+        }
+
+        await CompleteAsync(device, consent);
+
+        Assert.Equal(blocked, _result.IsError);
+    }
+
     private async Task<JsonNode> StartAsync()
     {
+        if (!_initialized)
+        {
+            _pipeline.Initialize();
+            _initialized = true;
+        }
+
         var response = await _pipeline.BackChannelClient.PostAsync(OidcServerPipeline.DeviceAuthorization, new FormUrlEncodedContent(new Dictionary<string, string>
         {
             { "client_id", "device" },

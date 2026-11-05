@@ -1,12 +1,34 @@
 namespace MinApiLib.Oidc.Server.Features.DeviceFlow;
 
 /// <summary>
-/// In-memory device flow store
+/// In-memory device flow store. Storing a device authorization also removes the expired ones, at most once a minute.
 /// </summary>
 /// <seealso cref="MinApiLib.Oidc.Server.Features.DeviceFlow.IDeviceFlowStore" />
 public class InMemoryDeviceFlowStore : IDeviceFlowStore
 {
+    private static readonly TimeSpan PurgeInterval = TimeSpan.FromMinutes(1);
+
     private readonly List<InMemoryDeviceAuthorization> _repository = new List<InMemoryDeviceAuthorization>();
+    private readonly TimeProvider _clock;
+    private DateTimeOffset _nextPurge;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InMemoryDeviceFlowStore"/> class with the system clock.
+    /// </summary>
+    public InMemoryDeviceFlowStore()
+        : this(TimeProvider.System)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InMemoryDeviceFlowStore"/> class.
+    /// </summary>
+    /// <param name="clock">The clock that decides which device authorizations have expired.</param>
+    public InMemoryDeviceFlowStore(TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        _clock = clock;
+    }
 
     /// <summary>
     /// Stores the device authorization request.
@@ -19,6 +41,13 @@ public class InMemoryDeviceFlowStore : IDeviceFlowStore
     {
         lock (_repository)
         {
+            var now = _clock.GetUtcNow();
+            if (now >= _nextPurge)
+            {
+                _nextPurge = now.Add(PurgeInterval);
+                _repository.RemoveAll(x => x.Data.CreationTime.AddSeconds(x.Data.Lifetime) < now.UtcDateTime);
+            }
+
             _repository.Add(new InMemoryDeviceAuthorization(deviceCode, userCode, data));
         }
 

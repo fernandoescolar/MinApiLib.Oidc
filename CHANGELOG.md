@@ -224,6 +224,12 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   device gets `access_denied` and the result has `IsAccessDenied`. Before, a response with an error and scopes
   authorized the device. With `RememberConsent` and a client that allows it, the consent is stored, as at the
   authorize endpoint.
+- **In-memory stores.** `InMemoryPersistedGrantStore` and `InMemoryDeviceFlowStore` remove expired entries when a
+  new one is stored, at most once a minute. Both take an optional `TimeProvider`.
+- **Return URL parsers.** An `IReturnUrlParser` registered before `AddOidcServer()` is added next to the OpenID
+  Connect parser instead of replacing it.
+- **Device flow limit.** `DeviceFlowOptions.UserCodeMaxFailedAttempts` can be `0`, which disables the limit, as its
+  documentation said. The options validator rejected it.
 - **Null handling.** Places that could throw `NullReferenceException` now throw `InvalidOperationException` with a
   message, for example when a UI URL is not configured.
 - **Log events.** Log messages have new event ids. Interaction errors are logged as "Interaction error: …".
