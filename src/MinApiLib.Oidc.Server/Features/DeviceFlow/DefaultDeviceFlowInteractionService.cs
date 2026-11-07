@@ -10,6 +10,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
     private readonly IScopeParser _scopeParser;
     private readonly IConsentService _consent;
     private readonly IDistributedCache _cache;
+    private readonly IEventService _events;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly OidcServerOptions _options;
     private readonly TimeProvider _clock;
@@ -25,6 +26,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         IScopeParser scopeParser,
         IConsentService consent,
         IDistributedCache cache,
+        IEventService events,
         IHttpContextAccessor httpContextAccessor,
         OidcServerOptions options,
         TimeProvider clock,
@@ -37,6 +39,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         _scopeParser = scopeParser;
         _consent = consent;
         _cache = cache;
+        _events = events;
         _httpContextAccessor = httpContextAccessor;
         _options = options;
         _clock = clock;
@@ -109,6 +112,7 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
         if (denied)
         {
             ServicesLog.DeviceFlowAuthorizationDenied(_logger, subject.GetSubjectId(), client.ClientId);
+            await _events.RaiseAsync(new ConsentDeniedEvent(subject.GetSubjectId(), client.ClientId, requestedScopes));
             return new DeviceFlowInteractionResult { IsAccessDenied = true };
         }
 
@@ -120,6 +124,13 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
                 : [];
             await _consent.UpdateConsentAsync(subject, client, parsedScopes);
         }
+
+        await _events.RaiseAsync(new ConsentGrantedEvent(
+            subject.GetSubjectId(),
+            client.ClientId,
+            requestedScopes,
+            consent.ScopesValuesConsented!,
+            consent.RememberConsent && client.AllowRememberConsent));
 
         return new DeviceFlowInteractionResult();
     }

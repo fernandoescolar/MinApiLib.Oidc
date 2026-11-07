@@ -25,8 +25,7 @@ external handler's `SignOutAsync`:
 app.MapPost("/account/logout", async (
     HttpContext http,
     [FromForm] string? logoutId,
-    IOidcServerInteractionService interaction,
-    IEventService events) =>
+    IOidcServerInteractionService interaction) =>
 {
     var user = http.User;
     if (user.Identity?.IsAuthenticated == true)
@@ -40,9 +39,8 @@ app.MapPost("/account/logout", async (
             logoutId ??= await interaction.CreateLogoutContextAsync();
         }
 
-        // delete the session cookie
+        // delete the session cookie; the server raises UserLogoutSuccessEvent
         await http.SignOutAsync();
-        await events.RaiseAsync(new UserLogoutSuccessEvent(user.GetSubjectId(), user.GetDisplayName()));
 
         if (external)
         {

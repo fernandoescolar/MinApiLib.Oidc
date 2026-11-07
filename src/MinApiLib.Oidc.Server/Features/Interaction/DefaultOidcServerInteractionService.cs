@@ -10,6 +10,7 @@ internal class DefaultOidcServerInteractionService : IOidcServerInteractionServi
     private readonly IConsentMessageStore _consentMessageStore;
     private readonly IPersistedGrantService _grants;
     private readonly IUserSession _userSession;
+    private readonly IEventService _events;
     private readonly ILogger _logger;
     private readonly ReturnUrlParser _returnUrlParser;
 
@@ -21,6 +22,7 @@ internal class DefaultOidcServerInteractionService : IOidcServerInteractionServi
         IConsentMessageStore consentMessageStore,
         IPersistedGrantService grants,
         IUserSession userSession,
+        IEventService events,
         ReturnUrlParser returnUrlParser,
         ILogger<DefaultOidcServerInteractionService> logger)
     {
@@ -31,6 +33,7 @@ internal class DefaultOidcServerInteractionService : IOidcServerInteractionServi
         _consentMessageStore = consentMessageStore;
         _grants = grants;
         _userSession = userSession;
+        _events = events;
         _returnUrlParser = returnUrlParser;
         _logger = logger;
     }
@@ -166,6 +169,7 @@ internal class DefaultOidcServerInteractionService : IOidcServerInteractionServi
         {
             var subject = user.GetSubjectId();
             await _grants.RemoveAllGrantsAsync(subject, clientId);
+            await _events.RaiseAsync(new GrantsRevokedEvent(subject, clientId));
         }
     }
 

@@ -52,6 +52,11 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
     protected readonly OidcServerOptions Options;
 
     /// <summary>
+    /// The event service, which raises the consent events.
+    /// </summary>
+    protected readonly IEventService Events;
+
+    /// <summary>
     /// The http context
     /// </summary>
     protected HttpContext HttpContext => _httpContextAccessor.HttpContext!;
@@ -66,6 +71,7 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
     /// <param name="nonceStore">The store of nonces issued by the nonce endpoint.</param>
     /// <param name="httpContextAccessor">The HTTP context accessor.</param>
     /// <param name="options">The options.</param>
+    /// <param name="events">The event service.</param>
     public AuthorizeInteractionResponseGenerator(
         TimeProvider clock,
         ILogger<AuthorizeInteractionResponseGenerator> logger,
@@ -73,9 +79,11 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
         IProfileService profile,
         IAuthorizationNonceStore nonceStore,
         IHttpContextAccessor httpContextAccessor,
-        OidcServerOptions options)
+        OidcServerOptions options,
+        IEventService events)
     {
         Options = options;
+        Events = events;
         Clock = clock;
         Logger = logger;
         Consent = consent;
@@ -498,6 +506,7 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
 
                     response.Error = error;
                     response.ErrorDescription = consent.ErrorDescription;
+                    await Events.RaiseAsync(new ConsentDeniedEvent(request.Subject.GetSubjectId(), request.Client.ClientId, request.RequestedScopes));
                 }
                 else
                 {
@@ -508,6 +517,7 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
                     {
                         response.Error = OidcConstants.AuthorizeErrors.AccessDenied;
                         ResponseAndHostingLog.UserDeniedRequiredScopes(Logger);
+                        await Events.RaiseAsync(new ConsentDeniedEvent(request.Subject.GetSubjectId(), request.Client.ClientId, request.RequestedScopes));
                     }
                     else
                     {
@@ -526,6 +536,13 @@ public class AuthorizeInteractionResponseGenerator : IAuthorizeInteractionRespon
 
                             await Consent.UpdateConsentAsync(request.Subject, request.Client, parsedScopes);
                         }
+
+                        await Events.RaiseAsync(new ConsentGrantedEvent(
+                            request.Subject.GetSubjectId(),
+                            request.Client.ClientId,
+                            request.RequestedScopes,
+                            consented,
+                            consent.RememberConsent && request.Client.AllowRememberConsent));
                     }
                 }
             }

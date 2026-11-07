@@ -230,6 +230,10 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   Connect parser instead of replacing it.
 - **Device flow limit.** `DeviceFlowOptions.UserCodeMaxFailedAttempts` can be `0`, which disables the limit, as its
   documentation said. The options validator rejected it.
+- **Events.** The server raises `UserLogoutSuccessEvent` when a signed-in user signs out of its cookie scheme,
+  `ConsentGrantedEvent` and `ConsentDeniedEvent` at the authorize endpoint and in the device flow, and
+  `GrantsRevokedEvent` from `RevokeUserConsentAsync`. They were left to the host's pages; a page that still raises
+  them reports each twice.
 - **Null handling.** Places that could throw `NullReferenceException` now throw `InvalidOperationException` with a
   message, for example when a UI URL is not configured.
 - **Log events.** Log messages have new event ids. Interaction errors are logged as "Interaction error: …".
@@ -257,6 +261,7 @@ Beyond the renames in the [server README](src/MinApiLib.Oidc.Server/README.md#di
   - Several constructors take `IIssuerNameService` instead of `IHttpContextAccessor`: `OidcServerTools`,
     `JwtRequestValidator`, `PrivateKeyJwtSecretValidator`, `LogoutNotificationService` and `DefaultTokenService`.
   - `EndSessionRequestValidator` takes `IClientStore`.
+  - `AuthorizeInteractionResponseGenerator` takes `IEventService`, exposed to derived classes as `Events`.
 - **Interfaces.**
   - Store interfaces return `Task<T?>` for lookups.
   - `ProfileDataRequestContext.RequestedResources` and `.ValidatedRequest` are nullable.

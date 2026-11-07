@@ -6,6 +6,7 @@ internal class OidcServerAuthenticationService : IAuthenticationService
     private readonly IAuthenticationSchemeProvider _schemes;
     private readonly TimeProvider _clock;
     private readonly IUserSession _session;
+    private readonly IEventService _events;
     private readonly ILogger<OidcServerAuthenticationService> _logger;
 
     public OidcServerAuthenticationService(
@@ -13,6 +14,7 @@ internal class OidcServerAuthenticationService : IAuthenticationService
         IAuthenticationSchemeProvider schemes,
         TimeProvider clock,
         IUserSession session,
+        IEventService events,
         ILogger<OidcServerAuthenticationService> logger)
     {
         _inner = inner;
@@ -20,6 +22,7 @@ internal class OidcServerAuthenticationService : IAuthenticationService
         _schemes = schemes;
         _clock = clock;
         _session = session;
+        _events = events;
         _logger = logger;
     }
 
@@ -52,12 +55,19 @@ internal class OidcServerAuthenticationService : IAuthenticationService
         var defaultScheme = await _schemes.GetDefaultSignOutSchemeAsync();
         var cookieScheme = await context.GetCookieAuthenticationSchemeAsync();
 
+        ClaimsPrincipal? user = null;
         if ((scheme == null && defaultScheme?.Name == cookieScheme) || scheme == cookieScheme)
         {
             context.SetSignOutCalled();
+            user = await _session.GetUserAsync();
         }
 
         await _inner.SignOutAsync(context, scheme, properties);
+
+        if (user != null)
+        {
+            await _events.RaiseAsync(new UserLogoutSuccessEvent(user.GetSubjectId(), user.GetDisplayName()));
+        }
     }
 
     public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)

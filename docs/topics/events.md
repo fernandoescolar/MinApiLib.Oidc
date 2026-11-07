@@ -109,24 +109,26 @@ The server raises these events:
 : Successful/failed requests at the nonce endpoint.
 
 `UserLoginSuccessEvent` & `UserLoginFailureEvent`
-: Raised by the resource owner password grant (with `interactive: false`). Raise them from your login page too.
+: Raised by the resource owner password grant (with `interactive: false`). Raise them from your login page too: the
+  server does not see the credentials.
+
+`UserLogoutSuccessEvent`
+: A signed-in user signed out of the server's cookie scheme, with `HttpContext.SignOutAsync()` on your logout page
+  or when the nonce pattern replaces the signed-in user.
+
+`ConsentGrantedEvent` & `ConsentDeniedEvent`
+: The user granted or denied consent: at the authorize endpoint, when the server processes the response your consent
+  page gave to `IOidcServerInteractionService.GrantConsentAsync` (leaving out a required scope is a denial), and in
+  the device flow, in `IDeviceFlowInteractionService.HandleRequestAsync`.
+
+`GrantsRevokedEvent`
+: The user revoked the grants of a client with `IOidcServerInteractionService.RevokeUserConsentAsync`.
 
 `InvalidClientConfigurationEvent`
 : A client loaded from the client store failed configuration validation.
 
 `UnhandledExceptionEvent`
 : An unhandled exception in a protocol endpoint.
-
-These are defined for your own pages, which the server does not include, to raise:
-
-`UserLogoutSuccessEvent`
-: Successful logout.
-
-`ConsentGrantedEvent` & `ConsentDeniedEvent`
-: Consent granted or denied on the consent page.
-
-`GrantsRevokedEvent`
-: The user revoked the grants of a client.
 
 ## Custom events
 

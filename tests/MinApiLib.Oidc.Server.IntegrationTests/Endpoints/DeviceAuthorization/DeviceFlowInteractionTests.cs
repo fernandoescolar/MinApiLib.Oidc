@@ -9,6 +9,7 @@ public class DeviceFlowInteractionTests : IDisposable
     private ConsentResponse _consent;
     private DeviceFlowInteractionResult _result;
     private bool _initialized;
+    private readonly List<Event> _events = [];
 
     public DeviceFlowInteractionTests()
     {
@@ -23,6 +24,8 @@ public class DeviceFlowInteractionTests : IDisposable
         _pipeline.ApiScopes.Add(new ApiScope("api"));
         _pipeline.ApiScopes.Add(new ApiScope("orders") { Required = true });
         _pipeline.Users.Add(new TestUser { SubjectId = "bob", Username = "bob" });
+
+        _pipeline.OnPostConfigureServices += services => services.AddSingleton<IEventSink>(new CapturingEventSink(_events));
 
         // The host's verification page: it completes the request for the signed-in user with the test's consent.
         _pipeline.OnPostConfigure += app => app.Map("/test/device", page => page.Run(async context =>
@@ -51,6 +54,14 @@ public class DeviceFlowInteractionTests : IDisposable
         Assert.False(_result.IsAccessDenied);
         Assert.True(token.StatusCode == HttpStatusCode.OK, token.Body.ToJsonString());
         Assert.Equal("openid api", token.Body["scope"]!.GetValue<string>());
+
+        var granted = Assert.Single(_events.OfType<ConsentGrantedEvent>());
+        Assert.Equal("bob", granted.SubjectId);
+        Assert.Equal("device", granted.ClientId);
+        Assert.Equal(["openid", "api"], granted.RequestedScopes);
+        Assert.Equal(["openid", "api"], granted.GrantedScopes);
+        Assert.False(granted.ConsentRemembered);
+        Assert.Empty(_events.OfType<ConsentDeniedEvent>());
     }
 
     [Fact]
@@ -66,6 +77,12 @@ public class DeviceFlowInteractionTests : IDisposable
         Assert.True(_result.IsAccessDenied);
         Assert.Equal(HttpStatusCode.BadRequest, token.StatusCode);
         Assert.Equal(OidcConstants.TokenErrors.AccessDenied, token.Body["error"]!.GetValue<string>());
+
+        var denied = Assert.Single(_events.OfType<ConsentDeniedEvent>());
+        Assert.Equal("bob", denied.SubjectId);
+        Assert.Equal("device", denied.ClientId);
+        Assert.Equal(["openid", "api"], denied.RequestedScopes);
+        Assert.Empty(_events.OfType<ConsentGrantedEvent>());
     }
 
     [Fact]
@@ -207,5 +224,18 @@ public class DeviceFlowInteractionTests : IDisposable
         }), TestContext.Current.CancellationToken);
 
         return (response.StatusCode, JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!);
+    }
+
+    private sealed class CapturingEventSink(List<Event> events) : IEventSink
+    {
+        public Task PersistAsync(Event evt)
+        {
+            lock (events)
+            {
+                events.Add(evt);
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }
