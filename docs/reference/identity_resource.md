@@ -23,7 +23,8 @@ group of user claims that a client requests with the `scope` parameter. See
 
 `Required`
 : Specifies whether the user can de-select the scope on the consent screen (if the consent screen implements such
-  a feature). Defaults to `false`.
+  a feature). A consent, at the authorize endpoint or in the device flow, that leaves out a requested required scope
+  is a denial: the client gets `access_denied`. Defaults to `false`.
 
 `Emphasize`
 : Specifies whether the consent screen will emphasize this scope (if the consent screen implements such a feature).

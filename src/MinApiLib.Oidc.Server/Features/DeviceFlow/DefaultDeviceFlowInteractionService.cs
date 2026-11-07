@@ -82,6 +82,18 @@ internal class DefaultDeviceFlowInteractionService : IDeviceFlowInteractionServi
             return LogAndReturnError("Invalid scopes", "Device authorization failure - consented scopes were not requested by the device");
         }
 
+        // As at the authorize endpoint: leaving out a required scope denies the request.
+        if (!denied)
+        {
+            var parsedScopes = _scopeParser.ParseScopeValues(requestedScopes);
+            var resources = await _resourceStore.CreateResourceValidationResult(parsedScopes);
+            if (resources.GetRequiredScopeValues().Any(scope => !consent.ScopesValuesConsented!.Contains(scope)))
+            {
+                ResponseAndHostingLog.UserDeniedRequiredScopes(_logger);
+                denied = true;
+            }
+        }
+
         var sid = await _session.GetSessionIdAsync();
 
         // A denial is stored as an authorization without scopes: the device code validator answers access_denied

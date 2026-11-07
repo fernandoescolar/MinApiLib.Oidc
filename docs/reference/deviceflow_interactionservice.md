@@ -26,8 +26,8 @@ var result = await deviceInteraction.HandleRequestAsync(userCode, allowed
 
 `HandleRequestAsync(string userCode, ConsentResponse consent)`
 : Completes device authorization for the user code, for the signed-in user, with the scopes in
-  `consent.ScopesValuesConsented`, which must all have been requested by the device. A consent with an `Error`, or
-  with no consented scopes, denies the request: the device gets `access_denied` at the token endpoint and the result
+  `consent.ScopesValuesConsented`, which must all have been requested by the device. A consent with an `Error`, with
+  no consented scopes, or without one of the requested scopes marked `Required`, denies the request: the device gets `access_denied` at the token endpoint and the result
   has `IsAccessDenied`. When the user grants it and the client has `AllowRememberConsent`, the consent is stored, as
   at the authorize endpoint, if `consent.RememberConsent` is set, and an earlier stored consent is removed if it is
   not. Returns a `DeviceFlowInteractionResult`.

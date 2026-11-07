@@ -222,8 +222,8 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   endpoints, instead of failing while reading the form.
 - **Device flow denial.** `IDeviceFlowInteractionService.HandleRequestAsync` honours `ConsentResponse.Error`: the
   device gets `access_denied` and the result has `IsAccessDenied`. Before, a response with an error and scopes
-  authorized the device. With `RememberConsent` and a client that allows it, the consent is stored, as at the
-  authorize endpoint.
+  authorized the device. As at the authorize endpoint, leaving out a requested `Required` scope also denies it, and
+  with `RememberConsent` and a client that allows it, the consent is stored.
 - **In-memory stores.** `InMemoryPersistedGrantStore` and `InMemoryDeviceFlowStore` remove expired entries when a
   new one is stored, at most once a minute. Both take an optional `TimeProvider`.
 - **Return URL parsers.** An `IReturnUrlParser` registered before `AddOidcServer()` is added next to the OpenID

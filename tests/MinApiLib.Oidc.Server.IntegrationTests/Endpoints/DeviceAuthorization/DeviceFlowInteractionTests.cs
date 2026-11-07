@@ -17,10 +17,11 @@ public class DeviceFlowInteractionTests : IDisposable
             ClientId = "device",
             ClientSecrets = { new Secret("secret".Sha256()) },
             AllowedGrantTypes = GrantTypes.DeviceFlow,
-            AllowedScopes = { "openid", "api" }
+            AllowedScopes = { "openid", "api", "orders" }
         });
         _pipeline.IdentityScopes.Add(new IdentityResources.OpenId());
         _pipeline.ApiScopes.Add(new ApiScope("api"));
+        _pipeline.ApiScopes.Add(new ApiScope("orders") { Required = true });
         _pipeline.Users.Add(new TestUser { SubjectId = "bob", Username = "bob" });
 
         // The host's verification page: it completes the request for the signed-in user with the test's consent.
@@ -82,19 +83,48 @@ public class DeviceFlowInteractionTests : IDisposable
 
     [Theory]
     [Trait("Category", Category)]
+    [InlineData("openid api")]
+    [InlineData("api orders")]
+    public async Task Leaving_out_a_required_scope_denies_the_request(string consented)
+    {
+        var device = await StartAsync("openid api orders");
+
+        await CompleteAsync(device, new ConsentResponse { ScopesValuesConsented = consented.Split(' ') });
+        var token = await PollAsync(device);
+
+        Assert.True(_result.IsAccessDenied);
+        Assert.Equal(OidcConstants.TokenErrors.AccessDenied, token.Body["error"]!.GetValue<string>());
+    }
+
+    [Fact]
+    [Trait("Category", Category)]
+    public async Task Optional_scopes_can_be_left_out()
+    {
+        var device = await StartAsync("openid api orders");
+
+        await CompleteAsync(device, new ConsentResponse { ScopesValuesConsented = ["openid", "orders"] });
+        var token = await PollAsync(device);
+
+        Assert.False(_result.IsAccessDenied);
+        Assert.True(token.StatusCode == HttpStatusCode.OK, token.Body.ToJsonString());
+        Assert.Equal("openid orders", token.Body["scope"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [Trait("Category", Category)]
     [InlineData(true)]
     [InlineData(false)]
     public async Task Granted_request_remembers_the_consent_when_asked(bool remember)
     {
         var device = await StartAsync();
 
-        await CompleteAsync(device, new ConsentResponse { ScopesValuesConsented = ["api"], RememberConsent = remember });
+        await CompleteAsync(device, new ConsentResponse { ScopesValuesConsented = ["openid", "api"], RememberConsent = remember });
 
         var store = _pipeline.Server.Services.GetRequiredService<IUserConsentStore>();
         var consent = await store.GetUserConsentAsync("bob", "device");
         if (remember)
         {
-            Assert.Equal(["api"], consent!.Scopes);
+            Assert.Equal(["api", "openid"], consent!.Scopes.Order(StringComparer.Ordinal));
         }
         else
         {
@@ -136,7 +166,7 @@ public class DeviceFlowInteractionTests : IDisposable
         Assert.Equal(blocked, _result.IsError);
     }
 
-    private async Task<JsonNode> StartAsync()
+    private async Task<JsonNode> StartAsync(string scope = "openid api")
     {
         if (!_initialized)
         {
@@ -148,7 +178,7 @@ public class DeviceFlowInteractionTests : IDisposable
         {
             { "client_id", "device" },
             { "client_secret", "secret" },
-            { "scope", "openid api" },
+            { "scope", scope },
         }), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
