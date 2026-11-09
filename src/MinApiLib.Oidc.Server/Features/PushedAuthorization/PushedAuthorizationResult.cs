@@ -50,7 +50,7 @@ internal class PushedAuthorizationErrorResult : IEndpointResult
     public Task ExecuteAsync(HttpContext context)
     {
         context.Response.SetNoCache();
-        context.Response.StatusCode = (int)StatusCode;
+        ClientAuthenticationChallenge.SetStatusCode(context, Error, StatusCode);
         return context.Response.WriteJsonAsync(new ErrorDto { error = Error, error_description = ErrorDescription });
     }
 

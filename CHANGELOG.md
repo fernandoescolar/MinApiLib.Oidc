@@ -230,6 +230,11 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   Connect parser instead of replacing it.
 - **Device flow limit.** `DeviceFlowOptions.UserCodeMaxFailedAttempts` can be `0`, which disables the limit, as its
   documentation said. The options validator rejected it.
+- **`invalid_client` with the `Authorization` header.** The token, device authorization, nonce and revocation
+  endpoints answer `401` with `WWW-Authenticate: Basic realm="OidcServer"` when a client that sent its credentials
+  in the `Authorization` header fails to authenticate, as RFC 6749 section 5.2 requires; credentials in the body
+  still get `400`. The PAR endpoint, which answers `401` either way, now sends the challenge too. IdentityModel
+  reports a `401` as an HTTP error (`ErrorType.Http`); the `invalid_client` error is in its `Json`.
 - **Events.** The server raises `UserLogoutSuccessEvent` when a signed-in user signs out of its cookie scheme,
   `ConsentGrantedEvent` and `ConsentDeniedEvent` at the authorize endpoint and in the device flow, and
   `GrantsRevokedEvent` from `RevokeUserConsentAsync`. They were left to the host's pages; a page that still raises

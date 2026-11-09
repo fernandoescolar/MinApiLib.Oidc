@@ -59,4 +59,7 @@ Errors are `400 Bad Request` with a JSON body, including client authentication f
 * `invalid_token`: `token` is missing, invalid or expired, belongs to another client, has no `sub` or the user is no
   longer active.
 
+A client that sent its credentials in the `Authorization` header and fails to authenticate gets `401 Unauthorized`
+with `WWW-Authenticate: Basic realm="OidcServer"` instead, as RFC 6749 section 5.2 requires.
+
 [[go back to index]](../index.md#documentation-structure)

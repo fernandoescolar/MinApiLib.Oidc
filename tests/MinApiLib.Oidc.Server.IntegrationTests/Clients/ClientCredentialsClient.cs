@@ -272,9 +272,7 @@ public class ClientCredentialsClient : IDisposable
             Scope = "api1"
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(response.IsError);
-        Assert.Equal(ResponseErrorType.Protocol, response.ErrorType);
-        Assert.Equal(OidcConstants.TokenErrors.InvalidClient, response.Error);
+        InvalidClientAssert.Unauthorized(response);
     }
 
     [Fact]
@@ -288,8 +286,7 @@ public class ClientCredentialsClient : IDisposable
             Scope = "api1"
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(response.IsError);
-        Assert.Equal("invalid_client", response.Error);
+        InvalidClientAssert.Unauthorized(response);
     }
 
     [Fact]
@@ -303,10 +300,7 @@ public class ClientCredentialsClient : IDisposable
             Scope = "api1"
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(response.IsError);
-        Assert.Equal(ResponseErrorType.Protocol, response.ErrorType);
-        Assert.Equal(HttpStatusCode.BadRequest, response.HttpStatusCode);
-        Assert.Equal("invalid_client", response.Error);
+        InvalidClientAssert.Unauthorized(response);
     }
 
     [Fact]
@@ -336,10 +330,7 @@ public class ClientCredentialsClient : IDisposable
             Scope = "api1"
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(response.IsError);
-        Assert.Equal(ResponseErrorType.Protocol, response.ErrorType);
-        Assert.Equal(HttpStatusCode.BadRequest, response.HttpStatusCode);
-        Assert.Equal("invalid_client", response.Error);
+        InvalidClientAssert.Unauthorized(response);
     }
 
     [Fact]

@@ -30,7 +30,7 @@ public class TokenRevocationErrorResult : IEndpointResult
     /// <returns></returns>
     public Task ExecuteAsync(HttpContext context)
     {
-        context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+        ClientAuthenticationChallenge.SetStatusCode(context, Error);
         return context.Response.WriteJsonAsync(new { error = Error });
     }
 }

@@ -333,8 +333,7 @@ public class RevocationTests : IDisposable
             Token = tokens.AccessToken
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsError);
-        Assert.Equal("invalid_client", result.Error);
+        InvalidClientAssert.Unauthorized(result);
     }
 
     [Fact]
@@ -353,8 +352,7 @@ public class RevocationTests : IDisposable
             Token = tokens.AccessToken
         }, cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsError);
-        Assert.Equal("invalid_client", result.Error);
+        InvalidClientAssert.Unauthorized(result);
     }
 
     [Fact]

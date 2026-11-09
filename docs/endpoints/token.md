@@ -142,7 +142,9 @@ The response has a `refresh_token` when the client has `AllowOfflineAccess` and 
 
 ## Errors
 
-Errors are `400 Bad Request` with a JSON body, including client authentication failures (`invalid_client`):
+Errors are `400 Bad Request` with a JSON body, including client authentication failures (`invalid_client`) when the
+credentials were in the body. A client that sent them in the `Authorization` header gets `401 Unauthorized` with
+`WWW-Authenticate: Basic realm="OidcServer"` instead, as RFC 6749 section 5.2 requires:
 
 ```http
 HTTP/1.1 400 Bad Request

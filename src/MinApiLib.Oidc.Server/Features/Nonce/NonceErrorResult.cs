@@ -13,7 +13,7 @@ internal class NonceErrorResult : IEndpointResult
 
     public Task ExecuteAsync(HttpContext context)
     {
-        context.Response.StatusCode = 400;
+        ClientAuthenticationChallenge.SetStatusCode(context, Error);
         context.Response.SetNoCache();
 
         var dto = new ResultDto

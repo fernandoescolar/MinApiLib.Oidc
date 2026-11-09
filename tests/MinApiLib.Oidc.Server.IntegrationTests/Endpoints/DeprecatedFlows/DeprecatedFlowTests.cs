@@ -263,8 +263,7 @@ public class DeprecatedFlowTests : IDisposable
         var response = await RequestPasswordTokenAsync("ropc.not_enabled", "password");
 
         // The client configuration validator rejects the client.
-        Assert.True(response.IsError);
-        Assert.Equal(OidcConstants.TokenErrors.InvalidClient, response.Error);
+        InvalidClientAssert.Unauthorized(response);
     }
 
     [Fact]

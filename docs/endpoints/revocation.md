@@ -52,4 +52,7 @@ Errors are `400 Bad Request` with a JSON body:
 * `invalid_request`: `token` is missing;
 * `unsupported_token_type`: `token_type_hint` is neither `access_token` nor `refresh_token`.
 
+A client that sent its credentials in the `Authorization` header and fails to authenticate gets `401 Unauthorized`
+with `WWW-Authenticate: Basic realm="OidcServer"` instead, as RFC 6749 section 5.2 requires.
+
 [[go back to index]](../index.md#documentation-structure)

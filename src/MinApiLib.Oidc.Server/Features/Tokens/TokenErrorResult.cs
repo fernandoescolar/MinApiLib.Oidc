@@ -13,7 +13,7 @@ internal class TokenErrorResult : IEndpointResult
 
     public Task ExecuteAsync(HttpContext context)
     {
-        context.Response.StatusCode = 400;
+        ClientAuthenticationChallenge.SetStatusCode(context, Response.Error);
         context.Response.SetNoCache();
 
         var dto = new ResultDto

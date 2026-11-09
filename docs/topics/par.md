@@ -41,8 +41,9 @@ The `request_uri` is single use. It stays valid while the user logs in and conse
 authorize endpoint answers the client, successfully or with an error. The return URLs handed to the login and consent
 pages carry only `client_id` and `request_uri`.
 
-A failed client authentication gets `401` with `invalid_client`; invalid parameters get `400` with the error the
-authorize endpoint would return. A body that is not `application/x-www-form-urlencoded` gets `415`.
+A failed client authentication gets `401` with `invalid_client` and `WWW-Authenticate: Basic realm="OidcServer"`;
+invalid parameters get `400` with the error the authorize endpoint would return. A body that is not
+`application/x-www-form-urlencoded` gets `415`.
 
 Microsoft's OpenID Connect handler (.NET 9 and later) pushes its authorize requests by itself when the discovery
 document announces the endpoint (`OpenIdConnectOptions.PushedAuthorizationBehavior`, `UseIfAvailable` by default).
