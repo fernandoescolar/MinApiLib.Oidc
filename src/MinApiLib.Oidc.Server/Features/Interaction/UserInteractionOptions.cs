@@ -6,28 +6,30 @@ namespace MinApiLib.Oidc.Server.Features.Interaction;
 public class UserInteractionOptions
 {
     /// <summary>
-    /// Gets or sets the login URL. If a local URL, the value must start with a leading slash.
+    /// Gets or sets the login URL. If a local URL, the value must start with a leading slash. Defaults to
+    /// <c>/account/login</c>.
     /// </summary>
     /// <value>
     /// The login URL.
     /// </value>
-    public string? LoginUrl { get; set; }
+    public string LoginUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Login;
 
     /// <summary>
-    /// Gets or sets the login return URL parameter.
+    /// Gets or sets the login return URL parameter. Defaults to <c>returnUrl</c>.
     /// </summary>
     /// <value>
     /// The login return URL parameter.
     /// </value>
-    public string? LoginReturnUrlParameter { get; set; }
+    public string LoginReturnUrlParameter { get; set; } = Constants.UIConstants.DefaultRoutePathParams.Login;
 
     /// <summary>
-    /// Gets or sets the logout URL. If a local URL, the value must start with a leading slash.
+    /// Gets or sets the logout URL. If a local URL, the value must start with a leading slash. Defaults to
+    /// <c>/account/logout</c>.
     /// </summary>
     /// <value>
     /// The logout URL.
     /// </value>
-    public string? LogoutUrl { get; set; }
+    public string LogoutUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Logout;
 
     /// <summary>
     /// Gets or sets the logout identifier parameter.
@@ -43,7 +45,7 @@ public class UserInteractionOptions
     /// <value>
     /// The consent URL.
     /// </value>
-    public string ConsentUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Consent.EnsureLeadingSlash();
+    public string ConsentUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Consent;
 
     /// <summary>
     /// Gets or sets the consent return URL parameter.
@@ -59,7 +61,7 @@ public class UserInteractionOptions
     /// <value>
     /// The error URL.
     /// </value>
-    public string ErrorUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Error.EnsureLeadingSlash();
+    public string ErrorUrl { get; set; } = Constants.UIConstants.DefaultRoutePaths.Error;
 
     /// <summary>
     /// Gets or sets the error identifier parameter.

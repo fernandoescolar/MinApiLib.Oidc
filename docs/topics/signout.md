@@ -60,8 +60,7 @@ on it.
 A client starts the sign-out by redirecting the user to the [end session endpoint](../endpoints/endsession.md). The
 endpoint keeps what the logout page needs, such as the client's post-logout redirect URI, as temporary state, and
 redirects to `UserInteraction.LogoutUrl` with its identifier in the `UserInteraction.LogoutIdParameter` query
-parameter (`logoutId`). `LogoutUrl` defaults to the `LogoutPath` of the session cookie handler (`/Account/Logout` in
-ASP.NET Core).
+parameter (`logoutId`). `LogoutUrl` defaults to `/account/logout`.
 
 `GetLogoutContextAsync(logoutId)` loads that state. `LogoutRequest.ShowSignoutPrompt` says whether the request is
 authenticated, so the page can skip the confirmation. Only a valid `id_token_hint` authenticates the request. A

@@ -11,9 +11,6 @@ internal static partial class LoggerExtensions
     [LoggerMessage(0x2F35, LogLevel.Error, "Malformed request body. aborting.")]
     public static partial void MalformedRequestBody(this ILogger logger);
 
-    [LoggerMessage(0x0F01, LogLevel.Debug, "Login Url: {LoginUrl}\nLogin Return Url Parameter: {LoginReturnUrlParameter}\nLogout Url: {LogoutUrl}\nConsent Url: {ConsentUrl}\nConsent Return Url Parameter: {ConsentReturnUrlParameter}\nError Url: {ErrorUrl}\nError Id Parameter: {ErrorIdParameter}")]
-    public static partial void PostConfigure(this ILogger logger, string LoginUrl, string LoginReturnUrlParameter, string LogoutUrl, string ConsentUrl, string ConsentReturnUrlParameter, string ErrorUrl, string ErrorIdParameter);
-
     [LoggerMessage(0x0F11, LogLevel.Information, "Starting OidcServer version {version}")]
     public static partial void StartingOidcServer(this ILogger logger, string version);
 

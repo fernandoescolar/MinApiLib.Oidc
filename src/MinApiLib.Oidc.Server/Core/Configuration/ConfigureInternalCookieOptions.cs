@@ -26,10 +26,7 @@ internal class ConfigureInternalCookieOptions : IConfigureNamedOptions<CookieAut
 
             options.LoginPath = ExtractLocalUrl(_idsrv.UserInteraction.LoginUrl);
             options.LogoutPath = ExtractLocalUrl(_idsrv.UserInteraction.LogoutUrl);
-            if (_idsrv.UserInteraction.LoginReturnUrlParameter != null)
-            {
-                options.ReturnUrlParameter = _idsrv.UserInteraction.LoginReturnUrlParameter;
-            }
+            options.ReturnUrlParameter = _idsrv.UserInteraction.LoginReturnUrlParameter;
         }
 
         if (name == ExternalCookieAuthenticationScheme)
@@ -53,46 +50,5 @@ internal class ConfigureInternalCookieOptions : IConfigureNamedOptions<CookieAut
         }
 
         return null;
-    }
-}
-
-[RegisterInIServiceCollection(typeof(IPostConfigureOptions<CookieAuthenticationOptions>), ServiceLifetime.Singleton)]
-internal class PostConfigureInternalCookieOptions : IPostConfigureOptions<CookieAuthenticationOptions>
-{
-    private readonly OidcServerOptions _idsrv;
-    private readonly IOptions<Microsoft.AspNetCore.Authentication.AuthenticationOptions> _authOptions;
-    private readonly ILogger _logger;
-
-    public PostConfigureInternalCookieOptions(
-        OidcServerOptions idsrv,
-        IOptions<Microsoft.AspNetCore.Authentication.AuthenticationOptions> authOptions,
-        ILoggerFactory loggerFactory)
-    {
-        _idsrv = idsrv;
-        _authOptions = authOptions;
-        _logger = loggerFactory.CreateLogger("MinApiLib.Oidc.Server.Startup");
-    }
-
-    public void PostConfigure(string? name, CookieAuthenticationOptions options)
-    {
-        var scheme = _idsrv.Authentication.CookieAuthenticationScheme ??
-            _authOptions.Value.DefaultAuthenticateScheme ??
-            _authOptions.Value.DefaultScheme;
-
-        if (name == scheme)
-        {
-            _idsrv.UserInteraction.LoginUrl = _idsrv.UserInteraction.LoginUrl ?? options.LoginPath;
-            _idsrv.UserInteraction.LoginReturnUrlParameter = _idsrv.UserInteraction.LoginReturnUrlParameter ?? options.ReturnUrlParameter;
-            _idsrv.UserInteraction.LogoutUrl = _idsrv.UserInteraction.LogoutUrl ?? options.LogoutPath;
-
-            _logger.PostConfigure(
-                _idsrv.UserInteraction.LoginUrl,
-                _idsrv.UserInteraction.LoginReturnUrlParameter,
-                _idsrv.UserInteraction.LogoutUrl,
-                _idsrv.UserInteraction.ConsentUrl,
-                _idsrv.UserInteraction.ConsentReturnUrlParameter,
-                _idsrv.UserInteraction.ErrorUrl,
-                _idsrv.UserInteraction.ErrorIdParameter);
-        }
     }
 }

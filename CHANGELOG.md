@@ -235,12 +235,15 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
   in the `Authorization` header fails to authenticate, as RFC 6749 section 5.2 requires; credentials in the body
   still get `400`. The PAR endpoint, which answers `401` either way, now sends the challenge too. IdentityModel
   reports a `401` as an HTTP error (`ErrorType.Http`); the `invalid_client` error is in its `Json`.
+- **Login and logout URLs.** `UserInteraction.LoginUrl`, `LogoutUrl` and `LoginReturnUrlParameter` default to
+  `/account/login`, `/account/logout` and `returnUrl`, and the session cookie handler takes them from there. Before,
+  they were copied from the cookie handler, whose defaults are `/Account/Login`, `/Account/Logout` and `ReturnUrl`.
 - **Events.** The server raises `UserLogoutSuccessEvent` when a signed-in user signs out of its cookie scheme,
   `ConsentGrantedEvent` and `ConsentDeniedEvent` at the authorize endpoint and in the device flow, and
   `GrantsRevokedEvent` from `RevokeUserConsentAsync`. They were left to the host's pages; a page that still raises
   them reports each twice.
 - **Null handling.** Places that could throw `NullReferenceException` now throw `InvalidOperationException` with a
-  message, for example when a UI URL is not configured.
+  message.
 - **Log events.** Log messages have new event ids. Interaction errors are logged as "Interaction error: …".
 
 ### Configuration

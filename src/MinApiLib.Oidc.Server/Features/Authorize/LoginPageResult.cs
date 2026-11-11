@@ -66,14 +66,13 @@ public class LoginPageResult : IEndpointResult
             returnUrl = returnUrl.AddQueryString(_request.Raw.ToQueryString());
         }
 
-        var loginUrl = _options.UserInteraction.LoginUrl
-            ?? throw new InvalidOperationException("UserInteraction.LoginUrl is not configured.");
+        var loginUrl = _options.UserInteraction.LoginUrl;
         if (!loginUrl.IsLocalUrl())
         {
             returnUrl = context.GetOidcServerHost().EnsureTrailingSlash() + returnUrl.RemoveLeadingSlash();
         }
 
-        var url = loginUrl.AddQueryString(_options.UserInteraction.LoginReturnUrlParameter ?? throw new InvalidOperationException("UserInteraction.LoginReturnUrlParameter is not configured."), returnUrl);
+        var url = loginUrl.AddQueryString(_options.UserInteraction.LoginReturnUrlParameter, returnUrl);
         context.Response.RedirectToAbsoluteUrl(url);
     }
 }

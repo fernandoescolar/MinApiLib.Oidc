@@ -64,8 +64,7 @@ public class EndSessionResult : IEndpointResult
             }
         }
 
-        var redirect = _options.UserInteraction.LogoutUrl
-            ?? throw new InvalidOperationException("UserInteraction.LogoutUrl is not configured.");
+        var redirect = _options.UserInteraction.LogoutUrl;
 
         if (redirect.IsLocalUrl())
         {

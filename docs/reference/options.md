@@ -175,12 +175,11 @@ The PKCE limits are read-only: `CodeChallengeMinLength` and `CodeVerifierMinLeng
 which parameters they receive. Local URLs must start with a slash.
 
 * `LoginUrl`, `LogoutUrl`
-  : The login and logout pages. If not set, they are taken from the `LoginPath` and `LogoutPath` of the host's
-    cookie authentication scheme. Default to `null`; with the server's own cookie handler they become ASP.NET Core's
-    defaults, `/Account/Login` and `/Account/Logout`.
+  : The login and logout pages. Default to `/account/login` and `/account/logout`. The server's session cookie
+    handler uses them as its `LoginPath` and `LogoutPath` when they are local.
 * `LoginReturnUrlParameter`
-  : The name of the return URL parameter passed to the login page. If not set, it is taken from the cookie
-    handler's `ReturnUrlParameter`, `returnUrl` by default.
+  : The name of the return URL parameter passed to the login page, and the cookie handler's `ReturnUrlParameter`.
+    Defaults to `returnUrl`.
 * `LogoutIdParameter`
   : The name of the logout message id parameter passed to the logout page. Defaults to `logoutId`.
 * `ConsentUrl`

@@ -19,17 +19,16 @@ This is how the server and the login page work together:
 
 1. A client sends the user to the authorize endpoint. The user has no session, so the server redirects to the login
    page, with the authorize request in the return URL:
-   `/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb...`.
+   `/account/login?returnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb...`.
 2. The login page reads the request from the return URL with `IOidcServerInteractionService.GetAuthorizationContextAsync`:
    the client, `login_hint`, `acr_values`, the requested scopes and so on.
 3. Once it has checked the user's credentials, the page signs the user in to the server's cookie with
    `HttpContext.SignInAsync(OidcServerUser)`, and redirects back to the return URL.
 4. The authorize endpoint finds the session and answers the client.
 
-By default the server sends the user to `/Account/Login` with a `ReturnUrl` parameter (the defaults of the ASP.NET
-Core cookie handler), to `/Account/Logout` with a `logoutId` parameter, and to `/home/error` with an `errorId`
-parameter. Routes are not case sensitive. `options.UserInteraction` changes them (`LoginUrl`,
-`LoginReturnUrlParameter`, `LogoutUrl`, `ErrorUrl`, ...); see [Server Options](../reference/options.md).
+By default the server sends the user to `/account/login` with a `returnUrl` parameter, to `/account/logout` with a
+`logoutId` parameter, and to `/home/error` with an `errorId` parameter. `options.UserInteraction` changes them
+(`LoginUrl`, `LoginReturnUrlParameter`, `LogoutUrl`, `ErrorUrl`, ...); see [Server Options](../reference/options.md).
 
 ### The users
 
@@ -342,11 +341,11 @@ GET /connect/authorize?client_id=web&request_uri=urn%3Aietf%3Aparams%3Aoauth%3Ar
 Host: localhost:5001
 ```
 
-The server redirects to your login page, with the authorize request in `ReturnUrl`:
+The server redirects to your login page, with the authorize request in `returnUrl`:
 
 ```http
 HTTP/1.1 302 Found
-Location: https://localhost:5001/Account/Login?ReturnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb%26request_uri%3D...
+Location: https://localhost:5001/account/login?returnUrl=%2Fconnect%2Fauthorize%2Fcallback%3Fclient_id%3Dweb%26request_uri%3D...
 ```
 
 Sign in as `alice` / `alice`. The login page redirects back to the authorize request, and the server posts the

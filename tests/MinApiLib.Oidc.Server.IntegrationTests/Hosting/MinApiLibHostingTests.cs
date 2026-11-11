@@ -15,7 +15,9 @@ using MinApiLib.Oidc.Server.Features.Authorize;
 using MinApiLib.Oidc.Server.Features.Discovery;
 using MinApiLib.Oidc.Server.Features.Tokens;
 using MinApiLib.Oidc.Server.Features.UserInfo;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 
 namespace MinApiLib.Oidc.Server.IntegrationTests.Hosting;
 
@@ -146,6 +148,26 @@ public class MinApiLibHostingTests : IDisposable
         var parsers = scope.ServiceProvider.GetServices<IReturnUrlParser>().ToList();
         Assert.Contains(parser, parsers);
         Assert.Contains(parsers, p => p is OidcReturnUrlParser);
+    }
+
+    [Fact]
+    [Trait("Category", Category)]
+    public void Login_and_logout_urls_default_to_the_server_routes_and_configure_the_session_cookie()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOidcServer();
+        using var provider = services.BuildServiceProvider();
+
+        var interaction = provider.GetRequiredService<OidcServerOptions>().UserInteraction;
+        Assert.Equal("/account/login", interaction.LoginUrl);
+        Assert.Equal("returnUrl", interaction.LoginReturnUrlParameter);
+        Assert.Equal("/account/logout", interaction.LogoutUrl);
+
+        var cookie = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(OidcServerConstants.DefaultCookieAuthenticationScheme);
+        Assert.Equal("/account/login", cookie.LoginPath);
+        Assert.Equal("returnUrl", cookie.ReturnUrlParameter);
+        Assert.Equal("/account/logout", cookie.LogoutPath);
     }
 
     [Theory]

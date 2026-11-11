@@ -59,11 +59,10 @@ Two options of `OidcServerOptions.UserInteraction` set the URL:
 
 | Option | Default |
 |---|---|
-| `LoginUrl` | The `LoginPath` of the session cookie handler: `/Account/Login` in ASP.NET Core |
-| `LoginReturnUrlParameter` | The `ReturnUrlParameter` of the session cookie handler: `ReturnUrl` in ASP.NET Core |
+| `LoginUrl` | `/account/login` |
+| `LoginReturnUrlParameter` | `returnUrl` |
 
-ASP.NET Core matches paths and query parameter names without regard to case, so the sample's `/account/login`
-page with a `returnUrl` parameter works with the defaults. To use another page, set the option:
+The server's session cookie handler uses the same page and parameter. To use another page, set the option:
 
 ```csharp
 builder.Services.AddOidcServer(options => options.UserInteraction.LoginUrl = "/signin");

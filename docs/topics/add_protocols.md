@@ -56,15 +56,15 @@ Inject `OidcServerOptions` to read the server's configuration. It has, e.g., the
 var returnUrl = QueryHelpers.AddQueryString("/wsfed", request.HttpContext.Request.Query);
 
 var url = QueryHelpers.AddQueryString(
-    options.UserInteraction.LoginUrl!,
-    options.UserInteraction.LoginReturnUrlParameter!,
+    options.UserInteraction.LoginUrl,
+    options.UserInteraction.LoginReturnUrlParameter,
     returnUrl);
 
 return Results.Redirect(url);
 ```
 
-(`QueryHelpers` is in `Microsoft.AspNetCore.WebUtilities`. `LoginUrl` and `LoginReturnUrlParameter` default to the
-login path and return URL parameter of the server's cookie.)
+(`QueryHelpers` is in `Microsoft.AspNetCore.WebUtilities`. `LoginUrl` and `LoginReturnUrlParameter` default to
+`/account/login` and `returnUrl`.)
 
 **Interaction between the login page and the current protocol request**
 
