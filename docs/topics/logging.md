@@ -48,22 +48,26 @@ When the server logs a token or authorize request, it leaves out the values list
 
 Add the names of your own sensitive parameters to them.
 
-## Setup for Serilog
+## Setup in code
 
-Any logging provider works. For example, with the third-party [Serilog](https://serilog.net/) and its
-`Serilog.AspNetCore` package:
+`WebApplication.CreateBuilder` already adds the console, debug and EventSource providers, so the server's messages
+reach the console with no setup. `builder.Logging` sets the format and the levels in code:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSerilog(logger => logger
-    .MinimumLevel.Debug()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-    .MinimumLevel.Override("Microsoft.AspNetCore.Authentication", LogEventLevel.Information)
-    .Enrich.FromLogContext()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}{NewLine}"));
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.TimestampFormat = "HH:mm:ss ";
+});
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+builder.Logging.AddFilter("MinApiLib.Oidc.Server", LogLevel.Debug);
 ```
+
+For structured output, for example to collect the logs from a container, use `AddJsonConsole()` instead of
+`AddSimpleConsole`: each message is a JSON object with its category, event ID and parameters.
 
 Higher level, structured information about what the server does is available as [events](events.md#refevents).
 

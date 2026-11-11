@@ -51,25 +51,20 @@ The default sink, `DefaultEventSink`, serializes the event to JSON and writes it
 level. To send events to an event store, implement `IEventSink` and register it in the container. Register it after
 `AddOidcServer`, or before it: either way it replaces the default (see [Startup](startup.md#refstartup)).
 
-The following example sends events to [Seq](https://datalust.co/seq) with the third-party Serilog library:
+The following example writes the events to their own log category with the .NET logger, as warnings when they are
+failures or errors, with the event's ID as the log event ID:
 
 ```csharp
-public sealed class SeqEventSink : IEventSink
+public sealed class AuditEventSink(ILogger<AuditEventSink> logger) : IEventSink
 {
-    private readonly Logger _log = new LoggerConfiguration()
-        .WriteTo.Seq("http://localhost:5341")
-        .CreateLogger();
-
     public Task PersistAsync(Event evt)
     {
-        if (evt.EventType is EventTypes.Success or EventTypes.Information)
-        {
-            _log.Information("{Name} ({Id}), Details: {@details}", evt.Name, evt.Id, evt);
-        }
-        else
-        {
-            _log.Error("{Name} ({Id}), Details: {@details}", evt.Name, evt.Id, evt);
-        }
+        var level = evt.EventType is EventTypes.Success or EventTypes.Information
+            ? LogLevel.Information
+            : LogLevel.Warning;
+
+        // Event.ToString() serializes the event to JSON.
+        logger.Log(level, new EventId(evt.Id, evt.Name), "{EventName}: {Details}", evt.Name, evt.ToString());
 
         return Task.CompletedTask;
     }
@@ -77,10 +72,11 @@ public sealed class SeqEventSink : IEventSink
 ```
 
 ```csharp
-builder.Services.AddSingleton<IEventSink, SeqEventSink>();
+builder.Services.AddSingleton<IEventSink, AuditEventSink>();
 ```
 
-Add the `Serilog.Sinks.Seq` package to your host to make the above code work.
+The category, the sink's full type name, can then get its own level or provider in the logging configuration (see
+[Logging](logging.md)).
 
 ## Built-in events
 
