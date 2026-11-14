@@ -8,7 +8,7 @@ exchanges it for a nonce, and another application signs the same user in by send
 [authorize endpoint](authorize.md). The nonce is short-lived and can be used only once, so it is safe in a URL: even if
 it ends up in the browser history or in server logs, it cannot be used again.
 
-This endpoint is not part of OpenID Connect or OAuth 2.0; it comes from the IdentityServer fork.
+This endpoint is not part of OpenID Connect or OAuth 2.0, nor of IdentityServer4; it is specific to this server.
 
 | Route | Parameters |
 |---|---|

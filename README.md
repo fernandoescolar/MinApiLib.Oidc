@@ -4,10 +4,9 @@ OpenID Connect and OAuth 2.0 for ASP.NET Core, server and clients, with proof of
 end to end. Built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib), targeting `net10.0` and `net11.0`,
 and maintained by @fernandoescolar.
 
-The server derives from an IdentityServer fork of [IdentityServer4](https://github.com/IdentityServer/IdentityServer4)
-4.1.2 (Apache-2.0). That fork, with its `IdentityServer` packages, is kept on the `archived/identity-server` branch
-and receives no further changes. This project is not affiliated with, nor endorsed by, the original authors or Duende
-Software.
+The server includes code derived from [IdentityServer4](https://github.com/IdentityServer/IdentityServer4) 4.1.2
+(Apache-2.0); the client and API packages are original to this project (see [License](#license)). MinApiLib.Oidc is
+not affiliated with, nor endorsed by, the authors of IdentityServer4 or Duende Software.
 
 ## Packages
 
@@ -134,20 +133,27 @@ Packages ship portable PDBs as `.snupkg` with Source Link enabled. The repositor
 so `Microsoft.SourceLink.GitHub` is referenced provisionally; switch to `Microsoft.SourceLink.AzureRepos.Git`
 if the code is hosted on Azure Repos, and fill in `RepositoryUrl` in `Directory.Build.props`.
 
-## Changes from IdentityServer4
+## Coming from IdentityServer4
 
-[CHANGELOG.md](CHANGELOG.md) summarises what changed from IdentityServer4 4.1.2.
+[CHANGELOG.md](CHANGELOG.md) summarises what is different from IdentityServer4 4.1.2 and how to move a host. The
+`archived/identity-server` branch keeps the IdentityServer packages this project grew out of; they receive no further
+changes.
 
 ## Documentation
 
-[docs/](docs/index.md) has quickstarts, topics, the endpoints and a reference of the server's options and models,
-derived from the IdentityServer4 documentation. Each package also has its README, and
+[docs/](docs/index.md) has quickstarts, topics, the endpoints and a reference of the server's options and models;
+parts of it derive from the IdentityServer4 documentation. Each package also has its README, and
 [docs/topics/pop.md](docs/topics/pop.md) walks through proof of possession message by message.
 
-## License and attribution
+## License
 
-Licensed under the [Apache License 2.0](LICENSE). IdentityServer4 is Copyright (c) Brock Allen and
-Dominick Baier; see [NOTICE](NOTICE) for the required attribution. MinApiLib is MIT licensed.
+Copyright (c) Fernando Escolar. Licensed under the [Apache License 2.0](LICENSE).
+
+`MinApiLib.Oidc.Server`, its integration tests and parts of the documentation include code and text derived from
+IdentityServer4, and the server's `Core.IdentityModel` namespace from IdentityModel. Both are Copyright (c) Brock Allen
+and Dominick Baier and licensed under the Apache License 2.0; [NOTICE](NOTICE) carries their attribution. The other
+packages, `MinApiLib.Oidc.DPoP`, `.Http`, `.Authentication`, `.JwtBearer` and `.Server.MongoDB`, are original to
+MinApiLib.Oidc. MinApiLib is MIT licensed.
 
 ## Acknowledgements
 
@@ -155,7 +161,7 @@ MinApiLib.Oidc is built using the following great open source projects:
 
 * [ASP.NET Core](https://github.com/dotnet/aspnetcore)
 * [MinApiLib](https://github.com/fernandoescolar/MinApiLib)
-* [IdentityServer4](https://github.com/IdentityServer/IdentityServer4) (the origin of `MinApiLib.Oidc.Server`)
+* [IdentityServer4](https://github.com/IdentityServer/IdentityServer4) (the origin of parts of `MinApiLib.Oidc.Server`)
 * [IdentityModel](https://github.com/IdentityModel/IdentityModel) (the source of `MinApiLib.Oidc.Server.Core.IdentityModel`)
 * [MongoDB C# driver](https://github.com/mongodb/mongo-csharp-driver)
 * [MinVer](https://github.com/adamralph/minver)

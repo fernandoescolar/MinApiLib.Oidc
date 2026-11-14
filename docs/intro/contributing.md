@@ -50,8 +50,10 @@ dotnet stryker --mutate "**/Core/DPoP/DefaultDPoPProofValidator.cs"
 
 ## Licensing
 
-The code is licensed under the [Apache License 2.0](../../LICENSE). The server derives from IdentityServer4; keep the
-attribution in [NOTICE](../../NOTICE). By contributing, you agree that your contribution is licensed under the same
-terms.
+The code is licensed under the [Apache License 2.0](../../LICENSE). Parts of the server, of its integration tests and
+of the documentation derive from IdentityServer4 and IdentityModel: keep their attribution in [NOTICE](../../NOTICE)
+and the copyright headers of the files that have them. A file that you derive from IdentityServer4 gets the same
+three-line header (the original copyright, the license and a line saying it was modified); a new file gets none. By
+contributing, you agree that your contribution is licensed under the same terms.
 
 [[go back to index]](../index.md#documentation-structure)

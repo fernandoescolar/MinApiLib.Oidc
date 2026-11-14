@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>OpenID Connect and OAuth 2.0 server for ASP.NET Core built on MinApiLib endpoints and attribute-based dependency injection. A new implementation derived from IdentityServer4 (Apache-2.0), with no dependency on IdentityServer packages.</Description>
+    <Description>OpenID Connect and OAuth 2.0 server for ASP.NET Core built on MinApiLib endpoints and attribute-based dependency injection. Includes code derived from IdentityServer4 4.1.2 (Apache-2.0); it does not depend on any IdentityServer package.</Description>
     <Product>MinApiLib.Oidc</Product>
+    <!-- Parts of this package are derived from IdentityServer4 and IdentityModel: see NOTICE. -->
+    <Copyright>Copyright (c) Fernando Escolar. Portions Copyright (c) Brock Allen &amp; Dominick Baier</Copyright>
     <PackageTags>OAuth2;OAuth 2.0;OpenID Connect;OIDC;Security;Identity;MinimalApi;MinApiLib</PackageTags>
     <Nullable>enable</Nullable>
   </PropertyGroup>

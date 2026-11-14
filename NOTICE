@@ -1,14 +1,8 @@
 MinApiLib.Oidc
 Copyright (c) Fernando Escolar
 
-MinApiLib.Oidc.Server is derived from an IdentityServer fork of IdentityServer4
-(https://github.com/IdentityServer/IdentityServer4), kept in this repository on the
-archived/identity-server branch, and is licensed under the Apache License, Version 2.0.
-
-IdentityServer4
-Copyright (c) Brock Allen & Dominick Baier
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
-file except in compliance with the License. You may obtain a copy of the License at
+software except in compliance with the License. You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
@@ -17,14 +11,19 @@ the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS
 KIND, either express or implied. See the License for the specific language governing
 permissions and limitations under the License.
 
-The original authors, Brock Allen and Dominick Baier, founded and maintained IdentityServer4
-until its end of life (November 2022). This project is not affiliated with, nor endorsed by,
-the original authors or Duende Software. Modifications are Copyright (c) Fernando Escolar
-and are also licensed under the Apache License, Version 2.0.
+This product includes software derived from the following projects, both licensed under
+the Apache License, Version 2.0:
 
-IdentityModel
+IdentityServer4 4.1.2 (https://github.com/IdentityServer/IdentityServer4)
 Copyright (c) Brock Allen & Dominick Baier
-Licensed under the Apache License, Version 2.0.
+Parts of MinApiLib.Oidc.Server, of its integration tests and of the documentation in
+docs/ are derived from IdentityServer4, with modifications.
+
+IdentityModel 7.0.0 (https://github.com/IdentityModel/IdentityModel)
+Copyright (c) Brock Allen & Dominick Baier
 The MinApiLib.Oidc.Server.Core.IdentityModel namespace and the test-only protocol client in
-tests/MinApiLib.Oidc.Server.IntegrationTests/Common/ProtocolClient are derived from IdentityModel 7.0.0
-(https://github.com/IdentityModel/IdentityModel), with modifications.
+tests/MinApiLib.Oidc.Server.IntegrationTests/Common/ProtocolClient are derived from
+IdentityModel, with modifications.
+
+MinApiLib.Oidc is not affiliated with, nor endorsed by, the authors of IdentityServer4 or
+Duende Software. The IdentityServer name is used only to describe the origin of the code.

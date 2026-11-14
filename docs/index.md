@@ -4,9 +4,9 @@ MinApiLib.Oidc is OpenID Connect and OAuth 2.0 for ASP.NET Core: a server, `Http
 access tokens, and DPoP (RFC 9449) support for APIs. It is built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib)
 and targets `net10.0` and `net11.0`.
 
-The server, `MinApiLib.Oidc.Server`, derives from an IdentityServer fork of
-[IdentityServer4](https://github.com/IdentityServer/IdentityServer4) 4.1.2, and this documentation from its
-documentation. The fork is kept, archived, on the `archived/identity-server` branch.
+The server, `MinApiLib.Oidc.Server`, includes code derived from
+[IdentityServer4](https://github.com/IdentityServer/IdentityServer4) 4.1.2, and parts of this documentation derive
+from its documentation (Apache License 2.0; see [NOTICE](../NOTICE)).
 
 - [Documentation structure](#documentation-structure)
 - [What it does](#what-it-does)

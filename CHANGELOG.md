@@ -1,10 +1,10 @@
 # Changelog
 
 This file summarises how MinApiLib.Oidc differs from
-[IdentityServer4 4.1.2](https://github.com/IdentityServer/IdentityServer4/tree/4.1.2), the last upstream release.
-`MinApiLib.Oidc.Server` derives from it through an IdentityServer fork, which this repository keeps, archived, on the
-`archived/identity-server` branch; the protocol changes below come from that fork. No version has been published
-yet, so every change is listed under *Unreleased*.
+[IdentityServer4 4.1.2](https://github.com/IdentityServer/IdentityServer4/tree/4.1.2), the last upstream release, from
+which parts of `MinApiLib.Oidc.Server` derive. The `archived/identity-server` branch keeps the intermediate
+IdentityServer packages, where many of the protocol changes below were first made. No version has been published yet,
+so every change is listed under *Unreleased*.
 
 ## [Unreleased]
 
@@ -15,7 +15,7 @@ Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.S
 - Rename the API. `AddIdentityServer()`, `UseIdentityServer()` and `IdentityServerOptions` become `AddOidcServer()`,
   `UseOidcServer()` and `OidcServerOptions`, and the `IdentityServer4.*` namespaces become
   `MinApiLib.Oidc.Server.Features.*` and `MinApiLib.Oidc.Server.Core.*`, by feature. The
-  [server README](src/MinApiLib.Oidc.Server/README.md#differences-from-the-identityserver-fork) maps every name.
+  [server README](src/MinApiLib.Oidc.Server/README.md#coming-from-identityserver) maps every name.
 - Replace `using IdentityModel;` with `using MinApiLib.Oidc.Server.Core.IdentityModel;`. The server does not depend
   on the `IdentityModel` package.
 - Rename the local API scope. A client that calls the server's own APIs with the `IdentityServerApi` scope needs
@@ -53,12 +53,13 @@ Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.S
   - Builds are reproducible.
   - Versions come from git tags (MinVer, default settings: `X.Y.Z` tags, `-alpha.0.<height>` pre-releases).
   - Packages ship Source Link with `.snupkg` symbols, XML documentation and a README.
-  - `LICENSE` and `NOTICE` carry the Apache-2.0 attribution to Brock Allen and Dominick Baier.
+  - `LICENSE` and `NOTICE` carry the Apache-2.0 license, Copyright (c) Fernando Escolar, and the attribution of the
+    code derived from IdentityServer4 and IdentityModel to Brock Allen and Dominick Baier. The source files derived
+    from them carry the original copyright header and say that they were modified.
   - Assemblies are not strong-name signed.
 - **`MinApiLib.Oidc.Server`.** The server, in one package, built on [MinApiLib](https://github.com/fernandoescolar/MinApiLib)
   endpoint records and attribute-based dependency injection (see [Hosting](#hosting)).
-  - The protocol behaviour is that of the IdentityServer fork, whose integration test suite runs against it in
-    `tests/MinApiLib.Oidc.Server.IntegrationTests`.
+  - Its integration test suite, in `tests/MinApiLib.Oidc.Server.IntegrationTests`, derives from IdentityServer4's.
   - `options.Authentication.EnforceAcrValues`, off by default, makes `acr_values` required: a session whose `acr`
     is not one of them goes back to the login page once (step-up), and then the client gets
     `unmet_authentication_requirements`, which is now returned to the client's redirect URI.
@@ -259,7 +260,7 @@ password grant answers `unsupported_grant_type`. The `password` parameter is rem
 
 ### API changes
 
-Beyond the renames in the [server README](src/MinApiLib.Oidc.Server/README.md#differences-from-the-identityserver-fork):
+Beyond the renames in the [server README](src/MinApiLib.Oidc.Server/README.md#coming-from-identityserver):
 
 - **Removed.**
   - `IEndpointRouter`, `IEndpointHandler` and `AddEndpoint<T>()`: endpoints are MinApiLib endpoint records.
