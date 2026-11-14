@@ -51,7 +51,7 @@ Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.S
     `Duende.IdentityModel` for client code.
 - **Builds and packaging.**
   - Builds are reproducible.
-  - Versions come from git tags (MinVer).
+  - Versions come from git tags (MinVer, default settings: `X.Y.Z` tags, `-alpha.0.<height>` pre-releases).
   - Packages ship Source Link with `.snupkg` symbols, XML documentation and a README.
   - `LICENSE` and `NOTICE` carry the Apache-2.0 attribution to Brock Allen and Dominick Baier.
   - Assemblies are not strong-name signed.

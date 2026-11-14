@@ -62,12 +62,6 @@
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
   </PropertyGroup>
 
-  <!-- MinVer: version from git tags (v1.2.3), pre-release otherwise -->
-  <PropertyGroup>
-    <MinVerTagPrefix>v</MinVerTagPrefix>
-    <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
-  </PropertyGroup>
-
   <ItemGroup Condition="'$(IsSrcProject)' == 'true'">
     <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="$(RepoRoot)NOTICE" Pack="true" PackagePath="\" Visible="false" />

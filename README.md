@@ -123,8 +123,9 @@ The HTML report is written to `StrykerOutput/`.
 
 ### Versioning
 
-Versions come from git tags via [MinVer](https://github.com/adamralph/minver): tag a commit `vX.Y.Z` to
-release that version; any other commit builds as `X.Y.(Z+1)-preview.0.<height>`. CI clones with full
+Versions come from git tags via [MinVer](https://github.com/adamralph/minver), with its default settings: tag a
+commit `X.Y.Z`, without a prefix, to release that version; any other commit builds as
+`X.Y.(Z+1)-alpha.0.<height>`, and `0.0.0-alpha.0.<height>` before the first tag. CI clones with full
 history and tags for this reason.
 
 ### Source Link and symbols

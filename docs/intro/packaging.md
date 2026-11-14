@@ -63,8 +63,9 @@ dotnet new nugetconfig
 dotnet nuget add source /path/to/MinApiLib.Oidc/artifacts --name minapilib-oidc --configfile nuget.config
 ```
 
-Versions come from git tags ([MinVer](https://github.com/adamralph/minver)). A commit without a release tag builds a
-prerelease version, so add `--prerelease` to `dotnet add package`.
+Versions come from git tags ([MinVer](https://github.com/adamralph/minver)): a release is a tag such as `1.2.0`,
+without a prefix. Any other commit builds an `-alpha.0.<height>` prerelease version, so add `--prerelease` to
+`dotnet add package`.
 
 The packages ship portable PDBs as `.snupkg` symbol packages with Source Link, XML documentation and a README.
 The repository's [README](../../README.md#building) has the details of the build settings, and
