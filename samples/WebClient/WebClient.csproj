@@ -3,7 +3,11 @@
     <RootNamespace>Samples.WebClient</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\Shared\SpaPages.cs" Link="SpaPages.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="MinApiLib.Endpoints" />
     <ProjectReference Include="..\..\src\MinApiLib.Oidc.Authentication\MinApiLib.Oidc.Authentication.csproj" />
   </ItemGroup>
+  <Import Project="..\ClientApp.targets" />
 </Project>

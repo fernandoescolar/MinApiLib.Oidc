@@ -9,14 +9,18 @@ and [MinApiLib.Oidc.Http](../src/MinApiLib.Oidc.Http/README.md).
 
 | Application | URL | What it does |
 |---|---|---|
-| [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login (password or passkey), passkey, logout and error pages. In memory, or on MongoDB |
-| [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application: OpenID Connect login (code flow with PKCE), calls the API with the user's token |
+| [Server](Server) | https://localhost:5001 | The OpenID Connect server, with login (password or passkey), passkey, logout and error pages in React. In memory, or on MongoDB |
+| [WebClient](WebClient) | https://localhost:5002 | ASP.NET Core web application with React pages: OpenID Connect login (code flow with PKCE), calls the API with the user's token |
 | [Api](Api) | https://localhost:5003 | Orders API: validates the access token and, for DPoP, the proof, with `AddJwtBearer().AddDPoP()` |
 | [Worker](Worker) | | Console application: calls the API with its own token (client credentials) and prints each request |
 
-The web applications are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records.
+The web applications are built with [MinApiLib](https://github.com/fernandoescolar/MinApiLib) endpoint records, and
+their pages with React (see [The frontend](#the-frontend)).
 
 ## Run
+
+The Server and the WebClient need [Node.js](https://nodejs.org) 20.19 or later (or 22.12 or later) to build their
+frontend: `dotnet build` and `dotnet run` install its packages and build it when it changes.
 
 1. Trust the ASP.NET Core development certificate, once. The three applications talk to each other over HTTPS:
 
@@ -68,6 +72,31 @@ The server keeps its configuration, grants and signing keys in the `oidcserver-s
 [MinApiLib.Oidc.Server.MongoDB](../src/MinApiLib.Oidc.Server.MongoDB/README.md). It writes the clients and resources
 of [Config.cs](Server/Config.cs) at startup. To use another MongoDB, set the `ConnectionStrings__Mongo`
 environment variable instead of using the profile.
+
+## The frontend
+
+The pages of the Server and the WebClient are a React + TypeScript + Tailwind application each, in `ClientApp/`,
+built by [Vite](https://vite.dev) into `wwwroot/`. Every page is a single-page application that the backend renders
+with the same index:
+
+```html
+<div id="app" app-id="login" app-model="eyJyZXR1cm5VcmwiOiIvY29ubmVjdC9hdXRob3JpemUv..."></div>
+<script type="module" src="/assets/main-D8ahmgX5.js"></script>
+```
+
+`app-id` says which page to mount ([src/pages/index.ts](Server/ClientApp/src/pages/index.ts)), and `app-model` carries
+its model as base64 UTF-8 JSON. An endpoint renders it with `spa.Render("login", "Sign in", model)`
+([SpaPages.cs](Shared/SpaPages.cs), shared by both applications), which reads the hashed file names of the build from
+Vite's manifest (`wwwroot/.vite/manifest.json`). The forms post to the backend as plain HTML forms, so the
+antiforgery token, the redirects and the error pages work as in any server-rendered application.
+
+The build runs Vite through [ClientApp.targets](ClientApp.targets): `npm ci` when `package-lock.json` changes, and
+`npm run build` (type check and Vite) when the frontend's sources change. While working on a page, run
+`npm run watch` in its `ClientApp/` folder and reload the browser: the backend picks up the new build without a
+restart. To build without Node.js, pass `-p:SkipClientApp=true`; the pages then need an earlier build in `wwwroot/`.
+
+To add a page, write its component in `src/pages/`, register it in `src/pages/index.ts` under an `app-id`, and render
+that `app-id` from an endpoint with its model.
 
 ## What to try
 

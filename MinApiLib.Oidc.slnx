@@ -26,7 +26,9 @@
   <Folder Name="/samples/">
     <File Path="samples/README.md" />
     <File Path="samples/compose.yaml" />
+    <File Path="samples/ClientApp.targets" />
     <File Path="samples/Directory.Build.props" />
+    <File Path="samples/Shared/SpaPages.cs" />
     <Project Path="samples/Api/Api.csproj" />
     <Project Path="samples/Server/Server.csproj" />
     <Project Path="samples/WebClient/WebClient.csproj" />

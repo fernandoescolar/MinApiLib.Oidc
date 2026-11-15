@@ -9,24 +9,19 @@ public sealed record LogoutPage() : GetHandlerAsync<LogoutPage.Request>("/accoun
     public readonly record struct Request(
         HttpContext HttpContext,
         [FromQuery] string? LogoutId,
-        [FromServices] IOidcServerInteractionService Interaction);
+        [FromServices] IOidcServerInteractionService Interaction,
+        [FromServices] SpaPages Spa);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
         var logout = await request.Interaction.GetLogoutContextAsync(request.LogoutId!);
         await request.HttpContext.SignOutAsync();
 
-        var iframe = logout.SignOutIFrameUrl == null
-            ? string.Empty
-            : $"""<iframe src="{Html.Encode(logout.SignOutIFrameUrl)}" width="0" height="0" style="display:none"></iframe>""";
-        var back = logout.PostLogoutRedirectUri == null
-            ? string.Empty
-            : $"""<p><a href="{Html.Encode(logout.PostLogoutRedirectUri)}">Return to {Html.Encode(logout.ClientName ?? logout.ClientId)}</a></p>""";
-
-        return Html.Page("Signed out", $"""
-            <p>You are signed out.</p>
-            {back}
-            {iframe}
-            """);
+        return request.Spa.Render("logout", "Signed out", new
+        {
+            postLogoutRedirectUri = logout.PostLogoutRedirectUri,
+            clientName = logout.ClientName ?? logout.ClientId,
+            signOutIFrameUrl = logout.SignOutIFrameUrl
+        });
     }
 }

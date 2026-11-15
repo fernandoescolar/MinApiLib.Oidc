@@ -3,7 +3,11 @@
     <RootNamespace>Samples.Server</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\Shared\SpaPages.cs" Link="SpaPages.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\MinApiLib.Oidc.Server\MinApiLib.Oidc.Server.csproj" />
     <ProjectReference Include="..\..\src\MinApiLib.Oidc.Server.MongoDB\MinApiLib.Oidc.Server.MongoDB.csproj" />
   </ItemGroup>
+  <Import Project="..\ClientApp.targets" />
 </Project>

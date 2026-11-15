@@ -7,16 +7,18 @@ public sealed record ErrorPage() : GetHandlerAsync<ErrorPage.Request>("/home/err
 {
     public readonly record struct Request(
         [FromQuery] string? ErrorId,
-        [FromServices] IOidcServerInteractionService Interaction);
+        [FromServices] IOidcServerInteractionService Interaction,
+        [FromServices] SpaPages Spa);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
         var error = request.ErrorId == null ? null : await request.Interaction.GetErrorContextAsync(request.ErrorId);
 
-        return Html.Page("Error", $"""
-            <p class="error"><strong>{Html.Encode(error?.Error ?? "unknown_error")}</strong></p>
-            <p>{Html.Encode(error?.ErrorDescription)}</p>
-            <p class="muted">Request id: {Html.Encode(error?.RequestId)}</p>
-            """);
+        return request.Spa.Render("error", "Error", new
+        {
+            error = error?.Error,
+            errorDescription = error?.ErrorDescription,
+            requestId = error?.RequestId
+        });
     }
 }

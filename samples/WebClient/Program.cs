@@ -31,8 +31,12 @@ builder.Services.AddHttpClient(Api.HttpClientName, client => client.BaseAddress 
 builder.Services.AddHttpClient(Api.RawHttpClientName, client => client.BaseAddress = apiUrl)
     .AddHttpMessageHandler(services => new ExchangeRecorder(services.GetRequiredService<IHttpContextAccessor>()));
 
+// The pages are a React frontend (ClientApp/, built into wwwroot/): each endpoint renders its page and model.
+builder.Services.AddSingleton(sp => new SpaPages(sp.GetRequiredService<IWebHostEnvironment>(), "Sample web client"));
+
 var app = builder.Build();
 
+app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 

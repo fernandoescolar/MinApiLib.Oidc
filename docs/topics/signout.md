@@ -67,22 +67,27 @@ authenticated, so the page can skip the confirmation. Only a valid `id_token_hin
 client can send just its `client_id` instead, so that its `post_logout_redirect_uri` can be checked against the
 registered URIs, but anyone can forge that request and the prompt is still shown.
 
-The logout page of [samples/Server](../../samples/Server/Pages/LogoutPage.cs) signs the user out, renders the
-front-channel iframe and links back to the client:
+The logout page of [samples/Server](../../samples/Server/Pages/LogoutPage.cs) signs the user out and hands the
+front-channel iframe URL and the way back to the client to its React page
+([LogoutPage.tsx](../../samples/Server/ClientApp/src/pages/LogoutPage.tsx)), which renders them:
 
 ```csharp
 var logout = await interaction.GetLogoutContextAsync(logoutId);
 await http.SignOutAsync();
 
-var iframe = logout.SignOutIFrameUrl == null
-    ? ""
-    : $"""<iframe src="{logout.SignOutIFrameUrl}" width="0" height="0" style="display:none"></iframe>""";
-var back = logout.PostLogoutRedirectUri == null
-    ? ""
-    : $"""<a href="{logout.PostLogoutRedirectUri}">Return to {logout.ClientName ?? logout.ClientId}</a>""";
+return spa.Render("logout", "Signed out", new
+{
+    postLogoutRedirectUri = logout.PostLogoutRedirectUri,
+    clientName = logout.ClientName ?? logout.ClientId,
+    signOutIFrameUrl = logout.SignOutIFrameUrl
+});
 ```
 
-(The sample HTML-encodes the values; it also signs out without a confirmation, to stay short.)
+```tsx
+{model.signOutIFrameUrl && <iframe src={model.signOutIFrameUrl} title="Front-channel logout" className="hidden" />}
+```
+
+(The sample signs out without a confirmation, to stay short.)
 
 By default the state travels protected in the `logoutId` value itself. To keep it elsewhere between the end session
 endpoint and the logout page, implement `IMessageStore<LogoutMessage>` and register it in the container.

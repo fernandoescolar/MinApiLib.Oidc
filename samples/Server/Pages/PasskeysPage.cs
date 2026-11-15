@@ -10,7 +10,8 @@ public sealed record PasskeysPage() : GetHandlerAsync<PasskeysPage.Request>("/ac
         [FromQuery] string? Message,
         [FromQuery] string? Error,
         [FromServices] UserManager<SampleUser> Users,
-        [FromServices] IAntiforgery Antiforgery);
+        [FromServices] IAntiforgery Antiforgery,
+        [FromServices] SpaPages Spa);
 
     public static async Task<SampleUser?> CurrentUserAsync(HttpContext http, UserManager<SampleUser> users)
         => http.User.Identity?.IsAuthenticated == true ? await users.FindByIdAsync(http.User.GetSubjectId()) : null;
@@ -30,50 +31,22 @@ public sealed record PasskeysPage() : GetHandlerAsync<PasskeysPage.Request>("/ac
             return Results.Redirect("/account/login?returnUrl=" + Uri.EscapeDataString("/account/passkeys"));
         }
 
-        var tokens = request.Antiforgery.GetAndStoreTokens(http);
-        var antiforgeryField = $"""<input type="hidden" name="{Html.Encode(tokens.FormFieldName)}" value="{Html.Encode(tokens.RequestToken)}">""";
         var passkeys = await request.Users.GetPasskeysAsync(user);
 
-        var rows = passkeys.Count == 0
-            ? """<tr><td colspan="4" class="muted">No passkeys yet.</td></tr>"""
-            : string.Concat(passkeys.Select(p => $"""
-                <tr>
-                  <td>{Html.Encode(p.Name)}</td>
-                  <td>{p.CreatedAt:yyyy-MM-dd HH:mm}</td>
-                  <td>{(p.IsBackedUp ? "Synced (swk)" : "This device (hwk)")}, {(p.IsUserVerified ? "user verified (mfa)" : "user present")}</td>
-                  <td>
-                    <form method="post" action="/account/passkey/remove">
-                      {antiforgeryField}
-                      <input type="hidden" name="id" value="{Base64Url.EncodeToString(p.CredentialId)}">
-                      <button type="submit">Remove</button>
-                    </form>
-                  </td>
-                </tr>
-                """));
-
-        var notice = request.Error != null
-            ? $"""<p class="error">{Html.Encode(request.Error)}</p>"""
-            : request.Message != null ? $"""<p class="ok">{Html.Encode(request.Message)}</p>""" : string.Empty;
-
-        return Html.Page($"Passkeys of {user.Name}", $"""
-            {notice}
-            <p>A passkey signs you in without a password, and cannot be phished: the browser only uses it on this server.
-               The tokens then say how you signed in: <code>amr</code> and <code>"acr": "phr"</code>.</p>
-            <table>
-              <tr><th>Name</th><th>Created</th><th>Kind</th><th></th></tr>
-              {rows}
-            </table>
-            <form id="add-passkey-form" method="post" action="/account/passkey/register">
-              {antiforgeryField}
-              <input type="hidden" name="credential">
-              <label for="name">Name of the new passkey</label>
-              <input id="name" name="name" placeholder="My laptop">
-              <button type="button" id="add-passkey-button">Add a passkey</button>
-              <p id="passkey-status" class="muted"></p>
-            </form>
-            <p class="muted">The sample keeps passkeys in memory: they are gone when the server restarts, so remove them from
-               your browser or password manager too.</p>
-            {PasskeyScripts.Register}
-            """);
+        return request.Spa.Render("passkeys", $"Passkeys of {user.Name}", new
+        {
+            userName = user.Name,
+            message = request.Message,
+            error = request.Error,
+            passkeys = passkeys.Select(p => new
+            {
+                id = Base64Url.EncodeToString(p.CredentialId),
+                name = p.Name,
+                createdAt = p.CreatedAt,
+                synced = p.IsBackedUp,
+                userVerified = p.IsUserVerified
+            }),
+            antiforgery = AntiforgeryModel.For(http, request.Antiforgery)
+        });
     }
 }

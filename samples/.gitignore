@@ -1,2 +1,5 @@
 # Signing keys created by automatic key management when the server runs without MongoDB.
 keys/
+
+# The frontends, built by Vite from ClientApp/.
+*/wwwroot/

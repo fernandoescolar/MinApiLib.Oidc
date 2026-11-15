@@ -54,13 +54,17 @@ builder.Services.AddSingleton<SampleUserDirectory>();
 builder.Services.AddSingleton<PasskeyState>();
 builder.Services.AddAntiforgery();
 
+// The pages are a React frontend (ClientApp/, built into wwwroot/): each endpoint renders its page and model.
+builder.Services.AddSingleton(sp => new SpaPages(sp.GetRequiredService<IWebHostEnvironment>(), "Sample OIDC server"));
+
 var app = builder.Build();
 
+app.UseStaticFiles();
 app.UseRouting();
 app.UseOidcServer();
 app.UseAntiforgery();
 
 app.MapOidcServer();  // the protocol endpoints
-app.MapEndpoints();   // the login, logout, error and home pages of this sample (MinApiLib records in Pages/)
+app.MapEndpoints();   // the login, passkeys, logout, error and home pages of this sample (MinApiLib records in Pages/)
 
 app.Run();

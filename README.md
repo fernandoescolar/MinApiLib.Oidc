@@ -71,11 +71,14 @@ deprecated by OAuth 2.1 and RFC 9700. They are available for existing clients, o
 client, an API and a worker. The web client signs the user in and calls the API with the user's access token, and
 the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. They use
 `MinApiLib.Oidc.Authentication`, `MinApiLib.Oidc.Http` and `MinApiLib.Oidc.JwtBearer` and show each HTTP request and
-response. The server's login accepts passwords and passkeys (ASP.NET Core Identity).
+response. The server's login accepts passwords and passkeys (ASP.NET Core Identity). The pages of the server and
+the web client are React + TypeScript + Tailwind, built with Vite.
 
 ## Building
 
-Requirements: .NET SDK 11.0.100 or a later feature band (pinned in `global.json`).
+Requirements: .NET SDK 11.0.100 or a later feature band (pinned in `global.json`), and Node.js 20.19 or later for
+the samples' frontends, which the build installs and builds with npm. Without Node.js, add `-p:SkipClientApp=true`
+to build everything else.
 
 ```bash
 dotnet build MinApiLib.Oidc.slnx

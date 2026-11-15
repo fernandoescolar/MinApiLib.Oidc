@@ -14,5 +14,6 @@ global using MinApiLib.Oidc.Server.Core.Users;
 global using MinApiLib.Oidc.Server.Features.Interaction;
 global using MinApiLib.Oidc.Server.MongoDB;
 
+global using Samples;
 global using Samples.Server.Passkeys;
 global using Samples.Server.Users;

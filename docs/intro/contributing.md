@@ -7,8 +7,9 @@ that does the job and tests that cover it.
 
 ## Building and testing
 
-Requirements: the .NET SDK pinned in `global.json` (11.0.100 or a later feature band), and Docker for the MongoDB
-tests.
+Requirements: the .NET SDK pinned in `global.json` (11.0.100 or a later feature band), Docker for the MongoDB
+tests, and Node.js 20.19 or later for the samples' React frontends, which the build installs and builds with npm
+(or build with `-p:SkipClientApp=true` to skip them).
 
 ```bash
 dotnet build MinApiLib.Oidc.slnx

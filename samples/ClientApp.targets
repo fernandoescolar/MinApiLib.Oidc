@@ -1,0 +1,37 @@
+<Project>
+  <!--
+    The frontend of a sample web application: ClientApp/, React + TypeScript + Tailwind built by Vite into wwwroot/.
+    The build installs its packages (npm ci) when package-lock.json changes and builds it when its sources change.
+    Without Node.js, build with -p:SkipClientApp=true; the pages then need a build of ClientApp in wwwroot/.
+  -->
+  <PropertyGroup>
+    <ClientAppDirectory>$(MSBuildProjectDirectory)/ClientApp</ClientAppDirectory>
+    <ClientAppManifest>$(MSBuildProjectDirectory)/wwwroot/.vite/manifest.json</ClientAppManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Vite writes wwwroot/ during the build, after MSBuild has listed the content, so wwwroot/ is served with
+         UseStaticFiles and published by ClientAppPublish instead of as static web assets. -->
+    <Content Remove="wwwroot/**;ClientApp/**" />
+    <None Remove="ClientApp/**" />
+    <None Include="ClientApp/**" Exclude="ClientApp/node_modules/**" />
+    <ClientAppInput Include="ClientApp/src/**/*;ClientApp/package.json;ClientApp/package-lock.json;ClientApp/vite.config.ts;ClientApp/tsconfig.json" />
+  </ItemGroup>
+
+  <Target Name="ClientAppInstall" Condition="'$(SkipClientApp)' != 'true'"
+          Inputs="$(ClientAppDirectory)/package-lock.json" Outputs="$(ClientAppDirectory)/node_modules/.package-lock.json">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(ClientAppDirectory)" />
+  </Target>
+
+  <Target Name="ClientAppBuild" BeforeTargets="BeforeBuild" DependsOnTargets="ClientAppInstall" Condition="'$(SkipClientApp)' != 'true'"
+          Inputs="@(ClientAppInput)" Outputs="$(ClientAppManifest)">
+    <Exec Command="npm run build" WorkingDirectory="$(ClientAppDirectory)" />
+  </Target>
+
+  <Target Name="ClientAppPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ClientAppFile Include="$(MSBuildProjectDirectory)/wwwroot/**" />
+      <ResolvedFileToPublish Include="@(ClientAppFile)" RelativePath="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+</Project>

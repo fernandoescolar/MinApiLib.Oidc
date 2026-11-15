@@ -58,7 +58,7 @@ var context = returnUrl == null ? null : await interaction.GetAuthorizationConte
 var user = username == null ? null : await users.FindByNameAsync(username);
 if (user == null || password == null || !await users.CheckPasswordAsync(user, password))
 {
-    return LoginPage.Render(http, antiforgery, returnUrl, context, "Invalid user name or password.");
+    return LoginPage.Render(http, spa, antiforgery, returnUrl, context, "Invalid user name or password.");
 }
 
 await http.SignInAsync(new OidcServerUser(user.Id)
@@ -150,7 +150,8 @@ A passkey sign-in is two requests from the login page:
 1. The page asks the server for the options (`IPasskeyHandler.MakeRequestOptionsAsync`). The server keeps the
    ceremony state, with its challenge, until the answer arrives; the sample keeps it in an encrypted cookie for five
    minutes ([PasskeyState.cs](../../samples/Server/Passkeys/PasskeyState.cs)). The browser asks the authenticator
-   with `navigator.credentials.get` ([PasskeyScripts.cs](../../samples/Server/Passkeys/PasskeyScripts.cs)).
+   with `navigator.credentials.get` ([passkeys.ts](../../samples/Server/ClientApp/src/passkeys.ts), in the sample's React
+   frontend).
 2. The page posts the browser's answer. The server checks it and signs the user in
    ([PasskeyEndpoints.cs](../../samples/Server/Pages/PasskeyEndpoints.cs)):
 
@@ -164,7 +165,7 @@ var result = await passkeys.PerformAssertionAsync(new PasskeyAssertionContext
 
 if (!result.Succeeded)
 {
-    return LoginPage.Render(http, antiforgery, returnUrl, context, $"The passkey was not accepted: {result.Failure.Message}");
+    return LoginPage.Render(http, spa, antiforgery, returnUrl, context, $"The passkey was not accepted: {result.Failure.Message}");
 }
 
 // keep the new signature counter, which reveals cloned authenticators
@@ -173,7 +174,8 @@ await Login.SignInWithPasskeyAsync(http, result.User, result.Passkey);
 ```
 
 Registering a passkey is the same with `MakeCreationOptionsAsync`, `navigator.credentials.create` and
-`PerformAttestationAsync`, on a page for the signed-in user ([PasskeysPage.cs](../../samples/Server/Pages/PasskeysPage.cs)).
+`PerformAttestationAsync`, on a page for the signed-in user ([PasskeysPage.cs](../../samples/Server/Pages/PasskeysPage.cs)
+and [PasskeysPage.tsx](../../samples/Server/ClientApp/src/pages/PasskeysPage.tsx)).
 
 ### How the user signed in: amr and acr
 

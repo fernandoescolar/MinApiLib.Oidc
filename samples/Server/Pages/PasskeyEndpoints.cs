@@ -32,7 +32,8 @@ public sealed record PasskeyLoginForm() : PostHandlerAsync<PasskeyLoginForm.Requ
         [FromServices] UserManager<SampleUser> Users,
         [FromServices] PasskeyState State,
         [FromServices] IOidcServerInteractionService Interaction,
-        [FromServices] IAntiforgery Antiforgery);
+        [FromServices] IAntiforgery Antiforgery,
+        [FromServices] SpaPages Spa);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
@@ -41,7 +42,7 @@ public sealed record PasskeyLoginForm() : PostHandlerAsync<PasskeyLoginForm.Requ
         var state = request.State.Take(http, PasskeyState.Assertion);
         if (state == null || string.IsNullOrEmpty(request.Credential))
         {
-            return LoginPage.Render(http, request.Antiforgery, request.ReturnUrl, context, "The passkey sign-in expired. Try again.");
+            return LoginPage.Render(http, request.Spa, request.Antiforgery, request.ReturnUrl, context, "The passkey sign-in expired. Try again.");
         }
 
         var result = await request.Passkeys.PerformAssertionAsync(new PasskeyAssertionContext
@@ -53,7 +54,7 @@ public sealed record PasskeyLoginForm() : PostHandlerAsync<PasskeyLoginForm.Requ
 
         if (!result.Succeeded)
         {
-            return LoginPage.Render(http, request.Antiforgery, request.ReturnUrl, context, $"The passkey was not accepted: {result.Failure.Message}");
+            return LoginPage.Render(http, request.Spa, request.Antiforgery, request.ReturnUrl, context, $"The passkey was not accepted: {result.Failure.Message}");
         }
 
         // Keep the new signature counter, which reveals cloned authenticators.

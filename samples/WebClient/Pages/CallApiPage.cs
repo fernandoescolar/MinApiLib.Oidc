@@ -9,7 +9,8 @@ public sealed record CallApiPage() : GetHandlerAsync<CallApiPage.Request>("/call
         HttpContext HttpContext,
         [FromQuery] string? Mode,
         [FromServices] IHttpClientFactory HttpClients,
-        [FromServices] IUserAccessTokenManager Tokens);
+        [FromServices] IUserAccessTokenManager Tokens,
+        [FromServices] SpaPages Spa);
 
     protected override async Task<IResult> HandleAsync(Request request, CancellationToken cancellationToken)
     {
@@ -24,27 +25,25 @@ public sealed record CallApiPage() : GetHandlerAsync<CallApiPage.Request>("/call
 
         var exchanges = await Api.CallAsync(request.HttpContext, request.HttpClients, request.Tokens, mode, cancellationToken);
 
-        var body = new StringBuilder();
-        body.Append(CultureInfo.InvariantCulture, $"""<p>{Html.Encode(Describe(mode, tokenType))}</p><p class="actions"><a href="/">Back</a></p>""");
-        for (var i = 0; i < exchanges.Count; i++)
+        return request.Spa.Render("call-api", "Calling the API", new
         {
-            var exchange = exchanges[i];
-            var title = exchanges.Count > 1 ? $" {i + 1}" : string.Empty;
-            body.Append(CultureInfo.InvariantCulture, $"<h2>Request{title}</h2>{Html.Pre(exchange.Request)}");
-            if (exchange.Proof != null)
+            description = Describe(mode, tokenType),
+            exchanges = exchanges.Select(exchange => new
             {
-                var (header, payload) = Jwt.Decode(exchange.Proof);
-                body.Append(CultureInfo.InvariantCulture, $"<p>The DPoP proof, decoded:</p>{Html.Pre(header)}{Html.Pre(payload)}");
-            }
+                request = exchange.Request,
+                proof = exchange.Proof == null ? null : Proof(exchange.Proof),
+                status = exchange.Status,
+                response = $"HTTP/1.1 {exchange.Status} {(HttpStatusCode)exchange.Status}\n"
+                    + (exchange.Challenge == null ? string.Empty : $"WWW-Authenticate: {exchange.Challenge}\n")
+                    + "\n" + exchange.Body
+            })
+        });
+    }
 
-            var css = exchange.Status < 300 ? "ok" : "fail";
-            var response = $"HTTP/1.1 {exchange.Status} {(HttpStatusCode)exchange.Status}\n"
-                + (exchange.Challenge == null ? string.Empty : $"WWW-Authenticate: {exchange.Challenge}\n")
-                + "\n" + exchange.Body;
-            body.Append(CultureInfo.InvariantCulture, $"""<h2 class="{css}">Response{title}</h2>{Html.Pre(response)}""");
-        }
-
-        return Html.Page("Calling the API", body.ToString());
+    private static object Proof(string proof)
+    {
+        var (header, payload) = Jwt.Decode(proof);
+        return new { header, payload };
     }
 
     private static string Describe(string mode, string tokenType) => mode switch
