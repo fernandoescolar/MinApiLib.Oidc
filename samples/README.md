@@ -34,7 +34,18 @@ frontend: `dotnet build` and `dotnet run` install its packages and build it when
    Only OpenSSL tools, such as `curl`, do not trust it. For those, set
    `SSL_CERT_DIR="$HOME/.aspnet/dev-certs/trust:/etc/ssl/certs"`.
 
-2. Start each application in its own terminal, from this folder:
+2. Start every sample with [Aspire](https://aspire.dev), from this folder. It needs Docker, for MongoDB:
+
+   ```bash
+   dotnet run apphost.cs
+   ```
+
+   [apphost.cs](apphost.cs) is a single-file program: it starts MongoDB in a container, the server on it, the API,
+   the web client and the worker, each when what it needs is up, and prints the URL of the Aspire dashboard, with
+   every application's state, logs and traces. The worker runs once; its output is in the dashboard. The
+   applications keep their URLs. Ctrl+C stops everything; the database stays in a Docker volume.
+
+   Or start each application in its own terminal, with the server in memory:
 
    ```bash
    dotnet run --project Server
@@ -48,30 +59,21 @@ frontend: `dotnet build` and `dotnet run` install its packages and build it when
    dotnet run --project WebClient
    ```
 
-3. Open https://localhost:5002 and sign in as `alice` / `alice` or `bob` / `bob`.
-
-4. To run the worker, with the server and the API started:
+   and, once the server and the API are up, the worker:
 
    ```bash
    dotnet run --project Worker
    ```
 
+3. Open https://localhost:5002 and sign in as `alice` / `alice` or `bob` / `bob`.
+
 ### With MongoDB
 
-Start MongoDB with the compose file of this folder and run the server with its `https-mongo` profile:
-
-```bash
-docker compose up -d
-```
-
-```bash
-dotnet run --project Server --launch-profile https-mongo
-```
-
-The server keeps its configuration, grants and signing keys in the `oidcserver-sample` database, using
-[MinApiLib.Oidc.Server.MongoDB](../src/MinApiLib.Oidc.Server.MongoDB/README.md). It writes the clients and resources
-of [Config.cs](Server/Config.cs) at startup. To use another MongoDB, set the `ConnectionStrings__Mongo`
-environment variable instead of using the profile.
+With Aspire, the server keeps its configuration, grants and signing keys in the `oidcserver-sample` database, using
+[MinApiLib.Oidc.Server.MongoDB](../src/MinApiLib.Oidc.Server.MongoDB/README.md): the AppHost gives it the
+`ConnectionStrings__Mongo` connection string. It writes the clients and resources of [Config.cs](Server/Config.cs) at
+startup. Without Aspire, the server's `https-mongo` profile uses a MongoDB on `mongodb://localhost:27017`; to use
+another one, set `ConnectionStrings__Mongo`.
 
 ## The frontend
 

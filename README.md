@@ -72,7 +72,8 @@ client, an API and a worker. The web client signs the user in and calls the API 
 the worker with its own token (client credentials), each as a bearer token or as a DPoP-bound token. They use
 `MinApiLib.Oidc.Authentication`, `MinApiLib.Oidc.Http` and `MinApiLib.Oidc.JwtBearer` and show each HTTP request and
 response. The server's login accepts passwords and passkeys (ASP.NET Core Identity). The pages of the server and
-the web client are React + TypeScript + Tailwind, built with Vite.
+the web client are React + TypeScript + Tailwind, built with Vite. `dotnet run apphost.cs` in `samples/` starts them
+all, with MongoDB, with Aspire.
 
 ## Building
 

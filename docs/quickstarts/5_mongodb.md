@@ -15,23 +15,21 @@ follows it.
 
 ## Start MongoDB
 
-Any MongoDB works. For development, run it in Docker with a compose file like the samples' `compose.yaml`:
-
-```yaml
-services:
-  mongo:
-    image: mongo:8.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-
-volumes:
-  mongo-data:
-```
+Any MongoDB works. For development, run it in Docker, with its data in a volume:
 
 ```bash
-docker compose up -d
+docker run -d --name mongo -p 27017:27017 -v mongo-data:/data/db mongo:8.0
+```
+
+The samples' [apphost.cs](../../samples/apphost.cs) does the same with [Aspire](https://aspire.dev), and hands the
+connection string to the server:
+
+```csharp
+var database = builder.AddMongoDB("mongodb").WithDataVolume().AddDatabase("oidcserver-sample");
+
+builder.AddProject<Projects.Server>("server")
+    .WithReference(database, connectionName: "Mongo")
+    .WaitFor(database);
 ```
 
 ## Add the package
