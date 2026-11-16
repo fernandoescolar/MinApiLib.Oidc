@@ -18,8 +18,13 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // The server keeps its configuration, grants and signing keys in this database, which survives restarts in a volume.
-var mongo = builder.AddMongoDB("mongodb")
-    .WithDataVolume();
+// MongoDB creates its admin user only when the volume is empty, so the password must stay the same from one run to
+// the next: a password Aspire generates, and keeps in user secrets, breaks the volume as soon as it is generated again
+// (authentication fails, and the health check reports MongoConnectionPoolPausedException). A fixed password for this
+// local sample database, published only on 127.0.0.1, and a named volume avoid it.
+var mongoPassword = builder.AddParameter("mongodb-password", "minapilib-oidc-samples", secret: true);
+var mongo = builder.AddMongoDB("mongodb", password: mongoPassword)
+    .WithDataVolume("minapilib-oidc-samples-mongodb");
 var database = mongo.AddDatabase("oidcserver-sample");
 
 // ConnectionStrings__Mongo turns on the server's MongoDB stores; it writes the sample clients and resources at startup.

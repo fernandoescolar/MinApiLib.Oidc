@@ -43,7 +43,8 @@ frontend: `dotnet build` and `dotnet run` install its packages and build it when
    [apphost.cs](apphost.cs) is a single-file program: it starts MongoDB in a container, the server on it, the API,
    the web client and the worker, each when what it needs is up, and prints the URL of the Aspire dashboard, with
    every application's state, logs and traces. The worker runs once; its output is in the dashboard. The
-   applications keep their URLs. Ctrl+C stops everything; the database stays in a Docker volume.
+   applications keep their URLs. Ctrl+C stops everything; the database stays in the `minapilib-oidc-samples-mongodb`
+   Docker volume (`docker volume rm minapilib-oidc-samples-mongodb` starts it again from scratch).
 
    Or start each application in its own terminal, with the server in memory:
 

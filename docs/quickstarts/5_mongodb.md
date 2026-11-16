@@ -25,12 +25,19 @@ The samples' [apphost.cs](../../samples/apphost.cs) does the same with [Aspire](
 connection string to the server:
 
 ```csharp
-var database = builder.AddMongoDB("mongodb").WithDataVolume().AddDatabase("oidcserver-sample");
+var password = builder.AddParameter("mongodb-password", "minapilib-oidc-samples", secret: true);
+var database = builder.AddMongoDB("mongodb", password: password)
+    .WithDataVolume("minapilib-oidc-samples-mongodb")
+    .AddDatabase("oidcserver-sample");
 
 builder.AddProject<Projects.Server>("server")
     .WithReference(database, connectionName: "Mongo")
     .WaitFor(database);
 ```
+
+MongoDB creates its admin user only when the volume is empty. Keep the password stable, as here, or keep it with the
+volume: if Aspire generates a new one, the server cannot authenticate against the old volume and the health check
+reports `MongoConnectionPoolPausedException`.
 
 ## Add the package
 
