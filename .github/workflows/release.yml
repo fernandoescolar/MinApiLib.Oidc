@@ -1,0 +1,132 @@
+name: Release
+
+# A release is a tag X.Y.Z or X.Y.Z-suffix, without a prefix: MinVer, with its default settings, takes the packages'
+# version from it.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    name: Build, test and pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # MinVer needs the tags and the history to find the version.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            10.0.x
+            11.0.x
+
+      # The samples' React frontends are built with Vite during the build.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: samples/*/ClientApp/package-lock.json
+
+      - name: Build
+        run: dotnet build MinApiLib.Oidc.slnx --configuration Release
+
+      - name: Test
+        run: dotnet test --solution MinApiLib.Oidc.slnx --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack MinApiLib.Oidc.slnx --configuration Release --no-build --output artifacts
+
+      # Fails if MinVer did not take the version from the tag (for example, a tag it does not recognize).
+      - name: Check the package version
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          packages=(artifacts/*.nupkg)
+          expected=(artifacts/*."$VERSION".nupkg)
+          if [ ${#packages[@]} -eq 0 ] || [ ${#packages[@]} -ne ${#expected[@]} ]; then
+            echo "::error::Expected every package to have version $VERSION:"
+            ls -1 artifacts
+            exit 1
+          fi
+          ls -1 artifacts
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/*
+          retention-days: 7
+
+  publish:
+    name: Publish to NuGet
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      # Trusted publishing: the job exchanges its GitHub OIDC token for a short-lived NuGet API key.
+      id-token: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: artifacts
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          # The nuget.org profile name (not the email) of the owner of the trusted publishing policy.
+          user: ${{ secrets.NUGET_USER }}
+
+      # Pushes each .nupkg and the .snupkg next to it. --skip-duplicate lets a failed run be re-run.
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: artifacts
+
+      - name: Create the release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg

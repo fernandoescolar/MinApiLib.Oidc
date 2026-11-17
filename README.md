@@ -131,11 +131,22 @@ commit `X.Y.Z`, without a prefix, to release that version; any other commit buil
 `X.Y.(Z+1)-alpha.0.<height>`, and `0.0.0-alpha.0.<height>` before the first tag. CI clones with full
 history and tags for this reason.
 
+### Releases
+
+Pushing a tag `X.Y.Z` (or `X.Y.Z-suffix`) runs [release.yml](.github/workflows/release.yml): it builds, tests and
+packs, publishes the packages to nuget.org with [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
+(no API key is stored; the `NUGET_USER` secret holds the nuget.org profile name of the policy's owner), and then
+creates the GitHub release with the packages.
+
+```bash
+git tag 1.0.0
+git push origin 1.0.0
+```
+
 ### Source Link and symbols
 
-Packages ship portable PDBs as `.snupkg` with Source Link enabled. The repository has no remote yet,
-so `Microsoft.SourceLink.GitHub` is referenced provisionally; switch to `Microsoft.SourceLink.AzureRepos.Git`
-if the code is hosted on Azure Repos, and fill in `RepositoryUrl` in `Directory.Build.props`.
+Packages ship portable PDBs as `.snupkg` with Source Link enabled (`Microsoft.SourceLink.GitHub`), and point to
+the repository through `RepositoryUrl` in `Directory.Build.props`.
 
 ## Coming from IdentityServer4
 

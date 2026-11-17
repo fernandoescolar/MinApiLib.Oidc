@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # MinVer computes the version from the tags and the commit height.
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            10.0.x
+            11.0.x
+
+      # The samples' React frontends are built with Vite during the build.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: samples/*/ClientApp/package-lock.json
+
+      - name: Restore
+        run: dotnet restore MinApiLib.Oidc.slnx
+
+      - name: Build
+        run: dotnet build MinApiLib.Oidc.slnx --configuration Release --no-restore
+
+      # The MongoDB tests start MongoDB in Docker (Testcontainers), which the runner provides.
+      - name: Test
+        run: dotnet test --solution MinApiLib.Oidc.slnx --configuration Release --no-build
+
+      - name: Pack
+        run: dotnet pack MinApiLib.Oidc.slnx --configuration Release --no-build --output artifacts
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/*
+          retention-days: 7
