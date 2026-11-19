@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/wwwroot/
+**/.vite/
+.git/
+.github/
+StrykerOutput/
+TestResults/
+artifacts/
+docs/
+tests/

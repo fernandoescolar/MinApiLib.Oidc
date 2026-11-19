@@ -19,6 +19,8 @@ from its documentation (Apache License 2.0; see [NOTICE](../NOTICE)).
   - [Supported Specifications](intro/specs.md)
   - [Packages and Builds](intro/packaging.md)
   - [Contributing](intro/contributing.md)
+- APPLICATIONS
+  - [MinApiLib IdP: the identity provider, as a Docker image](../apps/IdP/README.md)
 - QUICKSTARTS
   - [Overview](quickstarts/0_overview.md)
   - [Protecting an API using Client Credentials](quickstarts/1_client_credentials.md)

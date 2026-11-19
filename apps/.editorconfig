@@ -1,0 +1,27 @@
+# Application code (apps/) logs directly; the LoggerMessage rules apply to the shipped libraries only.
+[*.cs]
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+dotnet_diagnostic.CA2253.severity = none
+# Records bound by MinApiLib and documents mapped by the MongoDB driver are instantiated by reflection.
+dotnet_diagnostic.CA1812.severity = none
+# Collection properties on documents and API models are set by the serializers.
+dotnet_diagnostic.CA2227.severity = none
+dotnet_diagnostic.CA1002.severity = none
+dotnet_diagnostic.CA1819.severity = none
+# Application types are not consumed by other assemblies.
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA1724.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1310.severity = none
+dotnet_diagnostic.CA1309.severity = none
+dotnet_diagnostic.CA1308.severity = none
+dotnet_diagnostic.CA1308.severity = none
+dotnet_diagnostic.CA1510.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1034.severity = none
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1056.severity = none
+dotnet_diagnostic.CA5394.severity = none

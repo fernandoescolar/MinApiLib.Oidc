@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>IdP</RootNamespace>
+    <AssemblyName>IdP</AssemblyName>
+    <UserSecretsId>minapilib-oidc-idp</UserSecretsId>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MinApiLib.Oidc.Server\MinApiLib.Oidc.Server.csproj" />
+    <ProjectReference Include="..\..\src\MinApiLib.Oidc.Server.MongoDB\MinApiLib.Oidc.Server.MongoDB.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+  </ItemGroup>
+  <Import Project="..\..\samples\ClientApp.targets" />
+</Project>

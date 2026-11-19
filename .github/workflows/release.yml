@@ -33,13 +33,15 @@ jobs:
             10.0.x
             11.0.x
 
-      # The samples' React frontends are built with Vite during the build.
+      # The React frontends of the samples and of apps/IdP are built with Vite during the build.
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: samples/*/ClientApp/package-lock.json
+          cache-dependency-path: |
+            samples/*/ClientApp/package-lock.json
+            apps/*/ClientApp/package-lock.json
 
       - name: Build
         run: dotnet build MinApiLib.Oidc.slnx --configuration Release

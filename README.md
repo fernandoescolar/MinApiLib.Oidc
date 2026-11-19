@@ -65,6 +65,15 @@ deprecated by OAuth 2.1 and RFC 9700. They are available for existing clients, o
 `Client.AllowImplicitFlow`, `Client.AllowAccessTokensViaBrowser` and `Client.AllowResourceOwnerPasswordFlow`. See
 [docs/topics/grant_types.md](docs/topics/grant_types.md).
 
+## Applications
+
+[apps/IdP](apps/IdP/README.md) is a complete identity provider built on these packages, in the style of Keycloak: the
+server with its MongoDB stores, users with passwords, authenticator apps and passkeys, sign-in through external OpenID
+Connect providers, self-registration and e-mail flows, an account console, an administration console and a JSON
+administration API, all with React + TypeScript pages. `dotnet run apphost.cs` in `apps/` starts it with Aspire on a
+MongoDB container. It is published as a Docker image, `ghcr.io/fernandoescolar/minapilib-oidc-idp`, configured
+through environment variables.
+
 ## Samples
 
 [samples/](samples/README.md) has a server built with `MinApiLib.Oidc.Server` (in memory or on MongoDB), a web
@@ -78,7 +87,7 @@ all, with MongoDB, with Aspire.
 ## Building
 
 Requirements: .NET SDK 11.0.100 or a later feature band (pinned in `global.json`), and Node.js 20.19 or later for
-the samples' frontends, which the build installs and builds with npm. Without Node.js, add `-p:SkipClientApp=true`
+the frontends of the samples and of `apps/IdP`, which the build installs and builds with npm. Without Node.js, add `-p:SkipClientApp=true`
 to build everything else.
 
 ```bash
@@ -130,6 +139,12 @@ Versions come from git tags via [MinVer](https://github.com/adamralph/minver), w
 commit `X.Y.Z`, without a prefix, to release that version; any other commit builds as
 `X.Y.(Z+1)-alpha.0.<height>`, and `0.0.0-alpha.0.<height>` before the first tag. CI clones with full
 history and tags for this reason.
+
+### Docker image
+
+Every push to `main` and every `X.Y.Z` tag also builds the identity provider's image, `apps/IdP`, and publishes it to
+the GitHub Container Registry with [docker.yml](.github/workflows/docker.yml): `ghcr.io/fernandoescolar/minapilib-oidc-idp`
+tagged `latest`, `sha-<commit>`, `X.Y.Z` and `X.Y`, for `linux/amd64` and `linux/arm64`.
 
 ### Releases
 

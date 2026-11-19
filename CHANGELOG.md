@@ -8,6 +8,16 @@ so every change is listed under *Unreleased*.
 
 ## [Unreleased]
 
+### Applications
+
+- **`apps/IdP`.** A complete identity provider built on the packages, in the style of Keycloak, published as the
+  Docker image `ghcr.io/fernandoescolar/minapilib-oidc-idp`: users in MongoDB with ASP.NET Core Identity (passwords,
+  lockout, e-mail verification, authenticator apps with recovery codes, passkeys, external logins), sign-in through
+  external OpenID Connect providers configured at run time, self-registration, forgotten password, consent and device
+  verification pages, an account console, an administration console and a JSON administration API (clients,
+  resources, users, roles, groups, identity providers, sessions and tokens, signing keys, audit events). The pages are
+  React + TypeScript + Tailwind. See [its README](apps/IdP/README.md).
+
 ### Moving from IdentityServer4
 
 Read this before you move a host from IdentityServer4 4.1.2 to `MinApiLib.Oidc.Server`:

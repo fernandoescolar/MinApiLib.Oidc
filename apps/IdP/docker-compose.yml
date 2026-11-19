@@ -1,0 +1,48 @@
+# Runs the identity provider with MongoDB:
+#
+#   docker compose up
+#
+# Then open http://localhost:8080 and sign in as admin / the password below. Set IDP__ISSUER to the public URL when
+# a reverse proxy with TLS sits in front of it.
+services:
+  idp:
+    image: ghcr.io/fernandoescolar/minapilib-oidc-idp:latest
+    # Or build it from this repository:
+    # build:
+    #   context: ../..
+    #   dockerfile: apps/IdP/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Mongo: mongodb://idp:idp-password@mongodb:27017/?authSource=admin
+      IdP__Name: MinApiLib IdP
+      IdP__Admin__UserName: admin
+      IdP__Admin__Password: ChangeMe-123
+      IdP__Registration__Enabled: "true"
+      # IdP__Issuer: https://login.example.com
+      # IdP__Email__From: no-reply@example.com
+      # IdP__Email__Smtp__Host: smtp.example.com
+      # IdP__Email__Smtp__Port: "587"
+      # IdP__Email__Smtp__UserName: ...
+      # IdP__Email__Smtp__Password: ...
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:8
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: idp
+      MONGO_INITDB_ROOT_PASSWORD: idp-password
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:
